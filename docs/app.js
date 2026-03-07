@@ -999,15 +999,14 @@ async function exportRecordPdf(s, base) {
     y += barH + 8;
   };
 
-  const drawTable = (title, headers, rows, widths) => {
-    const fontSize = 8;
-    const rowH = 12;
-    const headerH = 14;
+  const drawTable = (title, headers, rows, widths, opts = {}) => {
+    const fontSize = opts.fontSize ?? 8;
+    const rowH = opts.rowH ?? 12;
+    const headerH = opts.showHeader === false ? 0 : (opts.headerH ?? 14);
     const titleH = 12;
     const totalH = titleH + headerH + rows.length * rowH + 4;
 
     if (totalH > (bottom - margin)) {
-      // If truly too large for a single page, start fresh and still render clipped sections safely.
       newPage();
     } else {
       ensureSpace(totalH);
@@ -1015,31 +1014,38 @@ async function exportRecordPdf(s, base) {
 
     sectionTitle(title);
 
-    const x = margin;
-    const colW = widths || headers.map(() => contentW / headers.length);
+    const x = opts.x ?? margin;
+    const tableW = opts.tableW ?? contentW;
+    const colW = widths || headers.map(() => tableW / headers.length);
 
     doc.setDrawColor(...colors.line);
-    doc.setFillColor(...colors.head);
-    doc.rect(x, y, contentW, headerH, 'FD');
 
-    let cx = x;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(fontSize);
-    doc.setTextColor(...colors.ink);
-    headers.forEach((h, i) => {
-      doc.text(String(h), cx + 4, y + 9);
-      cx += colW[i];
-      if (i < headers.length - 1) doc.line(cx, y, cx, y + headerH + rows.length * rowH);
-    });
+    if (headerH > 0) {
+      doc.setFillColor(...colors.head);
+      doc.rect(x, y, tableW, headerH, 'FD');
+
+      let cx = x;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(fontSize);
+      doc.setTextColor(...colors.ink);
+      headers.forEach((h, i) => {
+        doc.text(String(h), cx + 4, y + 9);
+        cx += colW[i];
+        if (i < headers.length - 1) doc.line(cx, y, cx, y + headerH + rows.length * rowH);
+      });
+    }
 
     let ry = y + headerH;
-    doc.setFont('helvetica', 'normal');
     rows.forEach((r) => {
-      doc.rect(x, ry, contentW, rowH);
+      doc.rect(x, ry, tableW, rowH);
       let rx = x;
       r.forEach((cell, i) => {
         const text = String(cell ?? '—');
         const clipped = doc.splitTextToSize(text, colW[i] - 6)[0] || '—';
+        const makeBold = opts.boldLeftColumn && i === 0;
+        doc.setFont('helvetica', makeBold ? 'bold' : 'normal');
+        doc.setFontSize(fontSize);
+        doc.setTextColor(...colors.ink);
         doc.text(clipped, rx + 3, ry + 8.5);
         rx += colW[i];
       });
@@ -1047,6 +1053,64 @@ async function exportRecordPdf(s, base) {
     });
 
     y = ry + 6;
+  };
+
+  const drawTopPairTables = (leftTitle, leftRows, rightTitle, rightRows) => {
+    const sectionH = 14;
+    const gap = 10;
+    const pairW = (contentW - gap) / 2;
+    const rowH = 12;
+    const leftTotal = leftRows.length * rowH;
+    const rightTotal = rightRows.length * rowH;
+    const innerTitleSpace = 12;
+    const totalH = sectionH + 8 + innerTitleSpace + Math.max(leftTotal, rightTotal) + 10;
+
+    ensureSpace(totalH);
+
+    // Major section bar
+    doc.setFillColor(...colors.black);
+    doc.rect(margin, y, contentW, sectionH, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...colors.white);
+    doc.text('SURVEY OVERVIEW', margin + 4, y + 9.5);
+    y += sectionH + 8;
+
+    const startY = y;
+    const leftX = margin;
+    const rightX = margin + pairW + gap;
+
+    // small titles
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...colors.accent);
+    doc.text(leftTitle.toUpperCase(), leftX, y + 8);
+    doc.text(rightTitle.toUpperCase(), rightX, y + 8);
+    y += innerTitleSpace;
+
+    const drawSimple = (x, rows) => {
+      let ry = y;
+      const colW = [pairW * 0.44, pairW * 0.56];
+      rows.forEach((r) => {
+        doc.setDrawColor(...colors.line);
+        doc.rect(x, ry, pairW, rowH);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...colors.ink);
+        doc.text(String(r[0] ?? '—'), x + 3, ry + 8.5);
+
+        doc.line(x + colW[0], ry, x + colW[0], ry + rowH);
+        doc.setFont('helvetica', 'normal');
+        const txt = doc.splitTextToSize(String(r[1] ?? '—'), colW[1] - 6)[0] || '—';
+        doc.text(txt, x + colW[0] + 3, ry + 8.5);
+        ry += rowH;
+      });
+      return ry;
+    };
+
+    const lyEnd = drawSimple(leftX, leftRows);
+    const ryEnd = drawSimple(rightX, rightRows);
+    y = Math.max(lyEnd, ryEnd) + 8;
   };
 
   drawHeader();
@@ -1063,7 +1127,6 @@ async function exportRecordPdf(s, base) {
     ['Longitude', s.longitude || '—'],
     ['Plot Type', s.PLOT_TYPE || '—']
   ];
-  drawTable('Survey Metadata', ['Field', 'Value'], metadataRows, [contentW * 0.38, contentW * 0.62]);
 
   const summaryRows = [
     ['Hydrophytic Vegetation', s.SummaryHydroVegYN || '—'],
@@ -1071,11 +1134,12 @@ async function exportRecordPdf(s, base) {
     ['Hydric Soil', s.SummaryHydricSoilYN || '—'],
     ['Point in Wetland', s.SummaryInWetlandYN || '—']
   ];
-  drawTable('Summary Conditions', ['Condition', 'Value'], summaryRows, [contentW * 0.66, contentW * 0.34]);
+
+  drawTopPairTables('Survey Metadata', metadataRows, 'Summary Conditions', summaryRows);
 
   const disturbanceRows = ['DistSoilYN','DistVegYN','DistHydroYN','ProbSoilYN','ProbVegYN','ProbHydroYN','ClimHydroNormalYN','CircNormalYN']
     .map(k => [displayLabel(k), s[k] || '—']);
-  drawTable('Disturbance & Problematic Conditions', ['Condition', 'Value'], disturbanceRows, [contentW * 0.66, contentW * 0.34]);
+  drawTable('Disturbance & Problematic Conditions', ['Condition', 'Value'], disturbanceRows, [contentW * 0.66, contentW * 0.34], { showHeader: false, boldLeftColumn: true });
 
   const vegRows = [
     ...speciesRows(s, 'Tree', 6).map(r => ['Tree', r[0], r[1]]),
@@ -1100,9 +1164,9 @@ async function exportRecordPdf(s, base) {
     ['Primary Indicators', (s.HydrologyPrimary || []).join(', ') || '—'],
     ['Secondary Indicators', (s.HydrologySecondary || []).join(', ') || '—']
   ];
-  drawTable('Wetland Hydrology', ['Field', 'Value'], hydroRows, [contentW * 0.45, contentW * 0.55]);
+  drawTable('Wetland Hydrology', ['Field', 'Value'], hydroRows, [contentW * 0.45, contentW * 0.55], { showHeader: false, boldLeftColumn: true });
 
-  drawTable('Notes', ['Field', 'Value'], [['Notes', s.notes || '—']], [contentW * 0.2, contentW * 0.8]);
+  drawTable('Notes', ['Field', 'Value'], [['Notes', s.notes || '—']], [contentW * 0.2, contentW * 0.8], { showHeader: false, boldLeftColumn: true });
 
   // Photos start on a new page; max 2 stacked per page, preserve aspect ratio.
   const photos = normalizePhotoObjects(s);
