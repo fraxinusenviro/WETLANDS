@@ -319,12 +319,25 @@ function bindActions() {
     }
   });
 
-  document.getElementById('btn-submit').onclick = () => {
-    state.timestamp = new Date().toISOString(); state.id = crypto.randomUUID();
-    surveys.push(structuredClone(state)); localStorage.setItem('wetlandSurveys', JSON.stringify(surveys));
-    localStorage.removeItem('wetlandCurrentDraft');
-    alert(`Survey submitted. Saved count: ${surveys.length}`);
-    state = defaultSurvey(); renderFormPages(); refreshDashboard(); renderSubmissions(); queueAutosave(true); showView('home');
+  document.getElementById('btn-submit').onclick = (e) => {
+    e?.preventDefault?.();
+    try {
+      state.timestamp = new Date().toISOString();
+      state.id = crypto.randomUUID();
+      surveys.push(cloneData(state));
+      localStorage.setItem('wetlandSurveys', JSON.stringify(surveys));
+      localStorage.removeItem('wetlandCurrentDraft');
+      alert(`Survey submitted. Saved count: ${surveys.length}`);
+      state = defaultSurvey();
+      renderFormPages();
+      refreshDashboard();
+      renderSubmissions();
+      queueAutosave(true);
+      showView('home');
+    } catch (err) {
+      console.error('Submit failed:', err);
+      alert('Submit failed. Please try again.');
+    }
   };
 
   const resetBtn = document.getElementById('btn-reset');
@@ -365,7 +378,7 @@ function renderSubmissions() {
 
   list.querySelectorAll('button[data-load]').forEach(b => b.onclick = () => {
     const id = b.dataset.load; const s = surveys.find(x => x.id === id); if (!s) return;
-    state = structuredClone(s); localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state));
+    state = cloneData(s); localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state));
     renderFormPages(); showView('form'); setActiveTab(0);
   });
 
@@ -450,6 +463,10 @@ function displayLabel(key) {
 
 function readStore(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { localStorage.removeItem(key); return fallback; } }
 function loadDraft() { return readStore('wetlandCurrentDraft', null); }
+function cloneData(obj) {
+  if (typeof structuredClone === 'function') return structuredClone(obj);
+  return JSON.parse(JSON.stringify(obj));
+}
 function queueAutosave(immediate=false) {
   if (immediate) return localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state));
   clearTimeout(autosaveTimer); autosaveTimer = setTimeout(() => localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state)), 350);
@@ -714,23 +731,21 @@ function exportRecord(fmt, raw) {
     return smartExport({ content: payload, filename: `${base}.html`, mime: 'text/html;charset=utf-8', preview: 'html' });
   }
   if (fmt === 'pdf') {
-    // Reliable HTML->PDF path: open printable HTML and trigger print dialog.
-    const html = recordHTML(s);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const w = window.open(url, '_blank', 'noopener');
-    if (!w) return alert('Pop-up blocked. Allow pop-ups to export PDF.');
-    w.addEventListener('load', () => setTimeout(() => w.print(), 500));
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-    return;
+    // Download-only flow (no pop-ups): export print-ready HTML for local Save as PDF.
+    const payload = recordHTML(s);
+    return smartExport({
+      content: payload,
+      filename: `${base}_printable.html`,
+      mime: 'text/html;charset=utf-8'
+    });
   }
 }
 
-function smartExport({ content, filename, mime, preview = 'text' }) {
+function smartExport({ content, filename, mime }) {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
 
-  // Attempt direct download first.
+  // Download-only path (no pop-ups/new tabs).
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
@@ -738,12 +753,6 @@ function smartExport({ content, filename, mime, preview = 'text' }) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-
-  // Fallback for restrictive mobile/webview clients: also open preview tab.
-  const w = window.open(url, '_blank', 'noopener');
-  if (!w) {
-    alert(`Export prepared (${filename}) but your browser blocked opening the file preview. Please allow pop-ups/downloads.`);
-  }
 
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
