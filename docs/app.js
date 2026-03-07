@@ -540,43 +540,156 @@ function recordMarkdown(s) {
 }
 
 function recordHTML(s) {
-  const veg = (title, rows) => `
-    <h3>${title}</h3>
-    <table><thead><tr><th>Species</th><th>% Cover</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table>`;
-  const soils = soilRows(s);
-  const row = (k) => `<p><strong>${displayLabel(k)}:</strong> ${s[k] || '—'}</p>`;
-  const photoBlock = (s.photos || []).length
-    ? `<h2>8. Field Photos</h2><div style='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px'>${(s.photos||[]).map((p,idx)=>`<figure style='margin:0;border:1px solid #ddd;padding:6px;border-radius:6px'><img src='${p.dataUrl || ''}' alt='${p.name || `Photo ${idx+1}`}' style='width:100%;height:auto;display:block'/><figcaption style='font-size:11px;color:#444;margin-top:4px'>${p.name || `Photo ${idx+1}`}</figcaption></figure>`).join('')}</div>`
-    : `<h2>8. Field Photos</h2><p>—</p>`;
+  const val = (k) => s[k] || '—';
+  const yesNo = (k) => (s[k] === 'Yes' ? 'Yes' : s[k] === 'No' ? 'No' : (s[k] || '—'));
+  const logoUrl = new URL('assets/fraxinus-logo.svg', window.location.href).href;
 
-  return `<!doctype html><html><head><meta charset='utf-8'/><title>${s.PLOT_ID||'Wetland Form'}</title>
+  const metadataRows = [
+    ['Site Name', val('SiteID')],
+    ['Plot ID', val('PLOT_ID')],
+    ['Surveyor', val('observer')],
+    ['Locale', val('LocaleName')],
+    ['Province', val('Province')],
+    ['Date', val('date')],
+    ['Time', val('time')],
+    ['Latitude', val('latitude')],
+    ['Longitude', val('longitude')],
+    ['Plot Type', val('PLOT_TYPE')]
+  ];
+
+  const summaryItems = [
+    ['Hydrophytic Vegetation', yesNo('SummaryHydroVegYN')],
+    ['Wetland Hydrology', yesNo('SummaryHydrologyYN')],
+    ['Hydric Soil', yesNo('SummaryHydricSoilYN')],
+    ['Point in Wetland', yesNo('SummaryInWetlandYN')]
+  ];
+
+  const vegRows = [
+    ...speciesRows(s, 'Tree', 6).map(r => ['Tree', r[0], r[1]]),
+    ...speciesRows(s, 'Shrub', 6).map(r => ['Shrub', r[0], r[1]]),
+    ...speciesRows(s, 'Herb', 10).map(r => ['Herb', r[0], r[1]])
+  ];
+
+  const soils = soilRows(s);
+  const photoBlock = (s.photos || []).length
+    ? `<div class='section'><h2>Field Photos</h2><div class='photo-grid'>${(s.photos||[]).map((p,idx)=>`<figure><img src='${p.dataUrl || ''}' alt='${p.name || `Photo ${idx+1}`}'/><figcaption>${p.name || `Photo ${idx+1}`}</figcaption></figure>`).join('')}</div></div>`
+    : `<div class='section'><h2>Field Photos</h2><p class='muted'>No photos attached.</p></div>`;
+
+  const now = new Date().toLocaleString();
+
+  return `<!doctype html><html><head><meta charset='utf-8'/><title>${s.PLOT_ID||'Wetland Report'}</title>
   <style>
-    body{font-family:Inter,Arial,sans-serif;padding:26px;color:#111;line-height:1.35}
-    .brand{display:flex;align-items:center;gap:12px;border-bottom:1px solid #ddd;padding-bottom:10px;margin-bottom:14px}
-    .brand img{width:42px;height:42px;object-fit:contain}
-    h1{font-size:22px;margin:0} h2{font-size:16px;margin:18px 0 8px} h3{font-size:14px;margin:10px 0 6px}
-    p{margin:4px 0} table{width:100%;border-collapse:collapse;margin:8px 0 12px} th,td{border:1px solid #ccc;padding:6px 8px;font-size:12px;text-align:left}
+    :root{--ink:#0f172a;--muted:#475569;--line:#cbd5e1;--head:#e2e8f0;--bg:#f8fafc;--accent:#0b6b50}
+    *{box-sizing:border-box}
+    body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;color:var(--ink);line-height:1.35;background:#fff}
+    .page{max-width:980px;margin:0 auto;padding:24px}
+    .header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:2px solid var(--line);padding-bottom:12px;margin-bottom:16px}
+    .header-left{display:flex;gap:12px;align-items:flex-start}
+    .header img{width:44px;height:44px;object-fit:contain}
+    h1{font-size:22px;line-height:1.15;margin:0 0 4px}
+    .sub{margin:0;color:var(--muted);font-size:12px}
+    .stamp{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
+    .section{margin:14px 0}
+    h2{font-size:16px;margin:0 0 8px}
+    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}
+    .card{border:1px solid var(--line);background:var(--bg);padding:10px;border-radius:6px}
+    .card .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em}
+    .card .value{font-size:14px;font-weight:700;color:var(--accent);margin-top:2px}
+    table{width:100%;border-collapse:collapse;margin:0}
+    th,td{border:1px solid var(--line);padding:6px 8px;font-size:12px;vertical-align:top}
+    th{background:var(--head);text-align:left}
+    .muted{color:var(--muted)}
+    .chipline{margin-top:8px;font-size:12px}
+    .chipline strong{color:#111827}
+    .photo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    figure{margin:0;border:1px solid var(--line);padding:6px;border-radius:6px}
+    figure img{width:100%;height:auto;display:block;border-radius:4px}
+    figcaption{font-size:11px;color:var(--muted);margin-top:4px}
+    @media print {
+      .page{padding:16px}
+      .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .section{page-break-inside:avoid}
+    }
   </style></head><body>
-    <div class='brand'><img src='assets/fraxinus-logo.svg' alt='Fraxinus'/><div><h1>WETLAND DELINEATION DATA FORM – NOVA SCOTIA</h1><p><strong>Plot ID:</strong> ${s.PLOT_ID || '—'}</p></div></div>
-    <h2>1. Survey Metadata</h2>
-    ${['SiteID','LocaleName','observer','latitude','longitude','Province','date','time','PLOT_TYPE'].map(row).join('')}
-    <h2>2. Disturbance & Problematic Conditions</h2>
-    ${['DistSoilYN','DistVegYN','DistHydroYN','ProbSoilYN','ProbVegYN','ProbHydroYN','ClimHydroNormalYN','CircNormalYN'].map(row).join('')}
-    <h2>3. Summary Conditions</h2>
-    ${['SummaryHydroVegYN','SummaryHydrologyYN','SummaryHydricSoilYN','SummaryInWetlandYN'].map(row).join('')}
-    <h2>4. Vegetation</h2>
-    ${veg('A. Tree Species', speciesRows(s,'Tree',6))}
-    ${veg('B. Shrub Species', speciesRows(s,'Shrub',6))}
-    ${veg('C. Herb Species', speciesRows(s,'Herb',10))}
-    <h2>5. Hydric Soils</h2>
-    <table><thead><tr><th>Horizon</th><th>Thickness (cm)</th><th>Texture</th><th>Matrix</th><th>Matrix %</th><th>Redox</th><th>Redox %</th><th>Type</th><th>Location</th></tr></thead><tbody>${soils.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>
-    <p><strong>Hydric Soil Indicators:</strong> ${(s.HydricSoilIndicators||[]).join(', ') || '—'}</p>
-    <h2>6. Wetland Hydrology</h2>
-    ${['RestrictiveLayer','RestrictiveLayerDepthCM','SurfaceWaterYN','SurfaceWaterDepthCM','WaterTableYN','WaterTableDepthCM','SaturationYN','SaturationDepthCM'].map(row).join('')}
-    <p><strong>Primary Indicators:</strong> ${(s.HydrologyPrimary||[]).join(', ') || '—'}</p>
-    <p><strong>Secondary Indicators:</strong> ${(s.HydrologySecondary||[]).join(', ') || '—'}</p>
-    <h2>7. Notes</h2><p>${s.notes || '—'}</p>
+  <div class='page'>
+    <div class='header'>
+      <div class='header-left'>
+        <img src='${logoUrl}' alt='Fraxinus'/>
+        <div>
+          <h1>Wetland Delineation Report</h1>
+          <p class='sub'>Nova Scotia Field Data Form</p>
+        </div>
+      </div>
+      <div class='stamp'>Generated ${now}</div>
+    </div>
+
+    <div class='section'>
+      <h2>Survey Metadata</h2>
+      <table>
+        <thead><tr><th style='width:38%'>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          ${metadataRows.map(([k,v])=>`<tr><td>${k}</td><td>${v || '—'}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class='section'>
+      <h2>Summary</h2>
+      <div class='cards'>
+        ${summaryItems.map(([k,v])=>`<div class='card'><div class='label'>${k}</div><div class='value'>${v}</div></div>`).join('')}
+      </div>
+    </div>
+
+    <div class='section'>
+      <h2>Disturbance & Problematic Conditions</h2>
+      <table>
+        <thead><tr><th>Condition</th><th>Value</th></tr></thead>
+        <tbody>
+          ${[
+            'DistSoilYN','DistVegYN','DistHydroYN','ProbSoilYN','ProbVegYN','ProbHydroYN','ClimHydroNormalYN','CircNormalYN'
+          ].map(k=>`<tr><td>${displayLabel(k)}</td><td>${yesNo(k)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class='section'>
+      <h2>Vegetation</h2>
+      <table>
+        <thead><tr><th style='width:12%'>Layer</th><th>Species</th><th style='width:16%'>% Cover</th></tr></thead>
+        <tbody>
+          ${vegRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('') || `<tr><td colspan='3' class='muted'>No vegetation records.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+
+    <div class='section'>
+      <h2>Hydric Soils</h2>
+      <table>
+        <thead><tr><th>Horizon</th><th>Thickness (cm)</th><th>Texture</th><th>Matrix</th><th>Matrix %</th><th>Redox</th><th>Redox %</th><th>Type</th><th>Location</th></tr></thead>
+        <tbody>${soils.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+      <p class='chipline'><strong>Hydric Soil Indicators:</strong> ${(s.HydricSoilIndicators||[]).join(', ') || '—'}</p>
+    </div>
+
+    <div class='section'>
+      <h2>Wetland Hydrology</h2>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          ${['RestrictiveLayer','RestrictiveLayerDepthCM','SurfaceWaterYN','SurfaceWaterDepthCM','WaterTableYN','WaterTableDepthCM','SaturationYN','SaturationDepthCM'].map(k=>`<tr><td>${displayLabel(k)}</td><td>${val(k)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <p class='chipline'><strong>Primary Indicators:</strong> ${(s.HydrologyPrimary||[]).join(', ') || '—'}</p>
+      <p class='chipline'><strong>Secondary Indicators:</strong> ${(s.HydrologySecondary||[]).join(', ') || '—'}</p>
+    </div>
+
+    <div class='section'>
+      <h2>Notes</h2>
+      <p>${s.notes || '—'}</p>
+    </div>
+
     ${photoBlock}
+  </div>
   </body></html>`;
 }
 
