@@ -629,7 +629,10 @@ function toCSV(rows) {
 function toGeoJSON(rows) { return { type:'FeatureCollection', features:rows.map(r => ({ type:'Feature', geometry:{ type:'Point', coordinates:[Number(r.longitude)||0, Number(r.latitude)||0] }, properties:r })) }; }
 
 function exportCleanRecord(s) {
-  return { ...s, photos: (s.photos || []).map(p => p.name) };
+  return {
+    ...s,
+    photos: (s.photos || []).map(p => (typeof p === 'string' ? p : (p?.name || 'photo')))
+  };
 }
 
 function speciesRows(s, group, n) {
@@ -858,34 +861,197 @@ function recordHTML(s) {
   </body></html>`;
 }
 
-function exportRecord(fmt, raw) {
-  const s = exportCleanRecord(raw);
-  const base = `${s.SiteID || 'Survey'}_${s.PLOT_ID || 'plot'}_${dateStamp()}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+let jsPdfCtorPromise = null;
+async function loadJsPdfCtor() {
+  if (window.jspdf?.jsPDF) return window.jspdf.jsPDF;
+  if (!jsPdfCtorPromise) {
+    jsPdfCtorPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+      script.async = true;
+      script.onload = () => {
+        if (window.jspdf?.jsPDF) resolve(window.jspdf.jsPDF);
+        else reject(new Error('jsPDF loaded but constructor missing'));
+      };
+      script.onerror = () => reject(new Error('Failed to load jsPDF library'));
+      document.head.appendChild(script);
+    });
+  }
+  return jsPdfCtorPromise;
+}
+
+function normalizePhotoObjects(s) {
+  return (s.photos || []).map((p, idx) => {
+    if (typeof p === 'string') return { name: `Photo ${idx + 1}`, dataUrl: '', missing: true };
+    return {
+      name: p?.name || `Photo ${idx + 1}`,
+      dataUrl: p?.dataUrl || '',
+      missing: !p?.dataUrl
+    };
+  });
+}
+
+async function measureImage(dataUrl) {
+  return await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
+    img.onerror = () => reject(new Error('Unable to decode image'));
+    img.src = dataUrl;
+  });
+}
+
+async function exportRecordPdf(s, base) {
+  const jsPDF = await loadJsPdfCtor();
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 42;
+  const maxW = pageW - margin * 2;
+  let y = margin;
+
+  const ensureSpace = (need = 14) => {
+    if (y + need > pageH - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  };
+
+  const line = (text = '', opts = {}) => {
+    const size = opts.size ?? 10;
+    const bold = !!opts.bold;
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(String(text), maxW);
+    const lineH = size + 3;
+    for (const ln of lines) {
+      ensureSpace(lineH);
+      doc.text(ln, margin, y);
+      y += lineH;
+    }
+  };
+
+  const kv = (k, v) => line(`${k}: ${v || '—'}`);
+
+  line('Wetland Delineation Report', { bold: true, size: 16 });
+  line('Nova Scotia Field Data Form', { size: 11 });
+  line(`Generated ${new Date().toLocaleString()}`, { size: 9 });
+  y += 6;
+
+  line('Survey Metadata', { bold: true, size: 12 });
+  [
+    ['Site Name', s.SiteID],
+    ['Plot ID', s.PLOT_ID],
+    ['Surveyor', s.observer],
+    ['Locale', s.LocaleName],
+    ['Province', s.Province],
+    ['Date', s.date],
+    ['Time', s.time],
+    ['Latitude', s.latitude],
+    ['Longitude', s.longitude],
+    ['Plot Type', s.PLOT_TYPE]
+  ].forEach(([k, v]) => kv(k, v));
+
+  y += 6;
+  line('Summary Conditions', { bold: true, size: 12 });
+  [
+    ['Hydrophytic Vegetation', s.SummaryHydroVegYN],
+    ['Wetland Hydrology', s.SummaryHydrologyYN],
+    ['Hydric Soil', s.SummaryHydricSoilYN],
+    ['Point in Wetland', s.SummaryInWetlandYN]
+  ].forEach(([k, v]) => kv(k, v));
+
+  y += 6;
+  line('Vegetation', { bold: true, size: 12 });
+  [...speciesRows(s, 'Tree', 6).map(r => ['Tree', r]), ...speciesRows(s, 'Shrub', 6).map(r => ['Shrub', r]), ...speciesRows(s, 'Herb', 10).map(r => ['Herb', r])]
+    .forEach(([layer, [sp, cov]]) => line(`${layer}: ${sp || '—'} (${cov || '—'}%)`));
+
+  y += 6;
+  line('Hydric Soil Indicators', { bold: true, size: 12 });
+  line((s.HydricSoilIndicators || []).join(', ') || '—');
+
+  y += 6;
+  line('Wetland Hydrology', { bold: true, size: 12 });
+  [
+    ['Restrictive Layer', s.RestrictiveLayer],
+    ['Restrictive Layer Depth (cm)', s.RestrictiveLayerDepthCM],
+    ['Surface Water', s.SurfaceWaterYN],
+    ['Surface Water Depth (cm)', s.SurfaceWaterDepthCM],
+    ['Water Table', s.WaterTableYN],
+    ['Water Table Depth (cm)', s.WaterTableDepthCM],
+    ['Saturation', s.SaturationYN],
+    ['Saturation Depth (cm)', s.SaturationDepthCM]
+  ].forEach(([k, v]) => kv(k, v));
+  kv('Primary Indicators', (s.HydrologyPrimary || []).join(', ') || '—');
+  kv('Secondary Indicators', (s.HydrologySecondary || []).join(', ') || '—');
+
+  y += 6;
+  line('Notes', { bold: true, size: 12 });
+  line(s.notes || '—');
+
+  const photos = normalizePhotoObjects(s);
+  y += 8;
+  line('Field Photos', { bold: true, size: 12 });
+
+  if (!photos.length) {
+    line('No photos attached.');
+  } else {
+    for (let i = 0; i < photos.length; i++) {
+      const p = photos[i];
+      line(`${i + 1}. ${p.name}`);
+      if (!p.dataUrl) {
+        line('Image data not available in this stored record.', { size: 9 });
+        y += 4;
+        continue;
+      }
+      try {
+        const dims = await measureImage(p.dataUrl);
+        const ratio = dims.width > 0 ? (dims.height / dims.width) : 0.75;
+        const w = maxW;
+        const h = Math.min(260, Math.max(120, w * ratio));
+        ensureSpace(h + 12);
+        const format = p.dataUrl.includes('image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(p.dataUrl, format, margin, y, w, h);
+        y += h + 10;
+      } catch {
+        line('Could not decode this image.', { size: 9 });
+      }
+    }
+  }
+
+  doc.save(`${base}.pdf`);
+}
+
+async function exportRecord(fmt, raw) {
+  const full = cloneData(raw);
+  const clean = exportCleanRecord(raw);
+  const base = `${full.SiteID || 'Survey'}_${full.PLOT_ID || 'plot'}_${dateStamp()}`.replace(/[^a-zA-Z0-9_-]/g, '_');
 
   if (fmt === 'geojson') {
-    const payload = JSON.stringify(toGeoJSON([s]), null, 2);
-    return smartExport({ content: payload, filename: `${base}.geojson`, mime: 'application/geo+json', preview: 'text' });
+    const payload = JSON.stringify(toGeoJSON([clean]), null, 2);
+    return smartExport({ content: payload, filename: `${base}.geojson`, mime: 'application/geo+json' });
   }
   if (fmt === 'md') {
-    const payload = recordMarkdown(s);
-    return smartExport({ content: payload, filename: `${base}.md`, mime: 'text/markdown;charset=utf-8', preview: 'text' });
+    const payload = recordMarkdown(clean);
+    return smartExport({ content: payload, filename: `${base}.md`, mime: 'text/markdown;charset=utf-8' });
   }
   if (fmt === 'csv') {
-    const payload = toCSV([s]);
-    return smartExport({ content: payload, filename: `${base}.csv`, mime: 'text/csv;charset=utf-8', preview: 'text' });
+    const payload = toCSV([clean]);
+    return smartExport({ content: payload, filename: `${base}.csv`, mime: 'text/csv;charset=utf-8' });
   }
   if (fmt === 'html') {
-    const payload = recordHTML(s);
-    return smartExport({ content: payload, filename: `${base}.html`, mime: 'text/html;charset=utf-8', preview: 'html' });
+    const payload = recordHTML(full);
+    return smartExport({ content: payload, filename: `${base}.html`, mime: 'text/html;charset=utf-8' });
   }
   if (fmt === 'pdf') {
-    // Download-only flow (no pop-ups): export print-ready HTML for local Save as PDF.
-    const payload = recordHTML(s);
-    return smartExport({
-      content: payload,
-      filename: `${base}_printable.html`,
-      mime: 'text/html;charset=utf-8'
-    });
+    try {
+      return await exportRecordPdf(full, base);
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      alert('PDF export failed in this browser. Downloading printable HTML fallback.');
+      const payload = recordHTML(full);
+      return smartExport({ content: payload, filename: `${base}_printable.html`, mime: 'text/html;charset=utf-8' });
+    }
   }
 }
 
