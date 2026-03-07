@@ -906,115 +906,216 @@ async function exportRecordPdf(s, base) {
 
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 42;
-  const maxW = pageW - margin * 2;
+  const margin = 36;
+  const contentW = pageW - margin * 2;
+  const bottom = pageH - margin;
+
+  const colors = {
+    ink: [15, 23, 42],
+    muted: [71, 85, 105],
+    line: [203, 213, 225],
+    head: [226, 232, 240],
+    accent: [11, 107, 80]
+  };
+
   let y = margin;
 
-  const ensureSpace = (need = 14) => {
-    if (y + need > pageH - margin) {
-      doc.addPage();
-      y = margin;
-    }
+  const newPage = () => { doc.addPage(); y = margin; };
+  const ensureSpace = (need = 12) => { if (y + need > bottom) newPage(); };
+
+  const drawHeader = () => {
+    ensureSpace(56);
+    doc.setDrawColor(...colors.line);
+    doc.line(margin, y + 40, pageW - margin, y + 40);
+
+    doc.setTextColor(...colors.ink);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.text('Wetland Delineation Report', margin, y + 16);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...colors.muted);
+    doc.text('Nova Scotia Field Data Form', margin, y + 30);
+    doc.text(`Generated ${new Date().toLocaleString()}`, pageW - margin, y + 16, { align: 'right' });
+    y += 52;
   };
 
-  const line = (text = '', opts = {}) => {
-    const size = opts.size ?? 10;
-    const bold = !!opts.bold;
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
-    doc.setFontSize(size);
-    const lines = doc.splitTextToSize(String(text), maxW);
-    const lineH = size + 3;
-    for (const ln of lines) {
-      ensureSpace(lineH);
-      doc.text(ln, margin, y);
-      y += lineH;
-    }
+  const sectionTitle = (title) => {
+    ensureSpace(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...colors.accent);
+    doc.text(title, margin, y);
+    y += 10;
   };
 
-  const kv = (k, v) => line(`${k}: ${v || '—'}`);
+  const drawTable = (title, headers, rows, widths) => {
+    const fontSize = 8;
+    const rowH = 12;
+    const headerH = 14;
+    const titleH = 12;
+    const totalH = titleH + headerH + rows.length * rowH + 4;
 
-  line('Wetland Delineation Report', { bold: true, size: 16 });
-  line('Nova Scotia Field Data Form', { size: 11 });
-  line(`Generated ${new Date().toLocaleString()}`, { size: 9 });
-  y += 6;
+    if (totalH > (bottom - margin)) {
+      // If truly too large for a single page, start fresh and still render clipped sections safely.
+      newPage();
+    } else {
+      ensureSpace(totalH);
+    }
 
-  line('Survey Metadata', { bold: true, size: 12 });
-  [
-    ['Site Name', s.SiteID],
-    ['Plot ID', s.PLOT_ID],
-    ['Surveyor', s.observer],
-    ['Locale', s.LocaleName],
-    ['Province', s.Province],
-    ['Date', s.date],
-    ['Time', s.time],
-    ['Latitude', s.latitude],
-    ['Longitude', s.longitude],
-    ['Plot Type', s.PLOT_TYPE]
-  ].forEach(([k, v]) => kv(k, v));
+    sectionTitle(title);
 
-  y += 6;
-  line('Summary Conditions', { bold: true, size: 12 });
-  [
-    ['Hydrophytic Vegetation', s.SummaryHydroVegYN],
-    ['Wetland Hydrology', s.SummaryHydrologyYN],
-    ['Hydric Soil', s.SummaryHydricSoilYN],
-    ['Point in Wetland', s.SummaryInWetlandYN]
-  ].forEach(([k, v]) => kv(k, v));
+    const x = margin;
+    const colW = widths || headers.map(() => contentW / headers.length);
 
-  y += 6;
-  line('Vegetation', { bold: true, size: 12 });
-  [...speciesRows(s, 'Tree', 6).map(r => ['Tree', r]), ...speciesRows(s, 'Shrub', 6).map(r => ['Shrub', r]), ...speciesRows(s, 'Herb', 10).map(r => ['Herb', r])]
-    .forEach(([layer, [sp, cov]]) => line(`${layer}: ${sp || '—'} (${cov || '—'}%)`));
+    doc.setDrawColor(...colors.line);
+    doc.setFillColor(...colors.head);
+    doc.rect(x, y, contentW, headerH, 'FD');
 
-  y += 6;
-  line('Hydric Soil Indicators', { bold: true, size: 12 });
-  line((s.HydricSoilIndicators || []).join(', ') || '—');
+    let cx = x;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(...colors.ink);
+    headers.forEach((h, i) => {
+      doc.text(String(h), cx + 4, y + 9);
+      cx += colW[i];
+      if (i < headers.length - 1) doc.line(cx, y, cx, y + headerH + rows.length * rowH);
+    });
 
-  y += 6;
-  line('Wetland Hydrology', { bold: true, size: 12 });
-  [
-    ['Restrictive Layer', s.RestrictiveLayer],
-    ['Restrictive Layer Depth (cm)', s.RestrictiveLayerDepthCM],
-    ['Surface Water', s.SurfaceWaterYN],
-    ['Surface Water Depth (cm)', s.SurfaceWaterDepthCM],
-    ['Water Table', s.WaterTableYN],
-    ['Water Table Depth (cm)', s.WaterTableDepthCM],
-    ['Saturation', s.SaturationYN],
-    ['Saturation Depth (cm)', s.SaturationDepthCM]
-  ].forEach(([k, v]) => kv(k, v));
-  kv('Primary Indicators', (s.HydrologyPrimary || []).join(', ') || '—');
-  kv('Secondary Indicators', (s.HydrologySecondary || []).join(', ') || '—');
+    let ry = y + headerH;
+    doc.setFont('helvetica', 'normal');
+    rows.forEach((r) => {
+      doc.rect(x, ry, contentW, rowH);
+      let rx = x;
+      r.forEach((cell, i) => {
+        const text = String(cell ?? '—');
+        const clipped = doc.splitTextToSize(text, colW[i] - 6)[0] || '—';
+        doc.text(clipped, rx + 3, ry + 8.5);
+        rx += colW[i];
+      });
+      ry += rowH;
+    });
 
-  y += 6;
-  line('Notes', { bold: true, size: 12 });
-  line(s.notes || '—');
+    y = ry + 6;
+  };
 
+  drawHeader();
+
+  const metadataRows = [
+    ['Site Name', s.SiteID || '—'],
+    ['Plot ID', s.PLOT_ID || '—'],
+    ['Surveyor', s.observer || '—'],
+    ['Locale', s.LocaleName || '—'],
+    ['Province', s.Province || '—'],
+    ['Date', s.date || '—'],
+    ['Time', s.time || '—'],
+    ['Latitude', s.latitude || '—'],
+    ['Longitude', s.longitude || '—'],
+    ['Plot Type', s.PLOT_TYPE || '—']
+  ];
+  drawTable('Survey Metadata', ['Field', 'Value'], metadataRows, [contentW * 0.38, contentW * 0.62]);
+
+  const summaryRows = [
+    ['Hydrophytic Vegetation', s.SummaryHydroVegYN || '—'],
+    ['Wetland Hydrology', s.SummaryHydrologyYN || '—'],
+    ['Hydric Soil', s.SummaryHydricSoilYN || '—'],
+    ['Point in Wetland', s.SummaryInWetlandYN || '—']
+  ];
+  drawTable('Summary Conditions', ['Condition', 'Value'], summaryRows, [contentW * 0.66, contentW * 0.34]);
+
+  const disturbanceRows = ['DistSoilYN','DistVegYN','DistHydroYN','ProbSoilYN','ProbVegYN','ProbHydroYN','ClimHydroNormalYN','CircNormalYN']
+    .map(k => [displayLabel(k), s[k] || '—']);
+  drawTable('Disturbance & Problematic Conditions', ['Condition', 'Value'], disturbanceRows, [contentW * 0.66, contentW * 0.34]);
+
+  const vegRows = [
+    ...speciesRows(s, 'Tree', 6).map(r => ['Tree', r[0], r[1]]),
+    ...speciesRows(s, 'Shrub', 6).map(r => ['Shrub', r[0], r[1]]),
+    ...speciesRows(s, 'Herb', 10).map(r => ['Herb', r[0], r[1]])
+  ];
+  drawTable('Vegetation', ['Layer', 'Species', '% Cover'], vegRows, [contentW * 0.14, contentW * 0.62, contentW * 0.24]);
+
+  const soilsRows = soilRows(s);
+  drawTable('Hydric Soils', ['Hor','Thk','Texture','Matrix','M%','Redox','R%','Type','Loc'], soilsRows,
+    [contentW*0.07,contentW*0.09,contentW*0.12,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.16]);
+
+  const hydroRows = [
+    ['Restrictive Layer', s.RestrictiveLayer || '—'],
+    ['Restrictive Layer Depth (cm)', s.RestrictiveLayerDepthCM || '—'],
+    ['Surface Water', s.SurfaceWaterYN || '—'],
+    ['Surface Water Depth (cm)', s.SurfaceWaterDepthCM || '—'],
+    ['Water Table', s.WaterTableYN || '—'],
+    ['Water Table Depth (cm)', s.WaterTableDepthCM || '—'],
+    ['Saturation', s.SaturationYN || '—'],
+    ['Saturation Depth (cm)', s.SaturationDepthCM || '—'],
+    ['Primary Indicators', (s.HydrologyPrimary || []).join(', ') || '—'],
+    ['Secondary Indicators', (s.HydrologySecondary || []).join(', ') || '—']
+  ];
+  drawTable('Wetland Hydrology', ['Field', 'Value'], hydroRows, [contentW * 0.45, contentW * 0.55]);
+
+  drawTable('Notes', ['Field', 'Value'], [['Notes', s.notes || '—']], [contentW * 0.2, contentW * 0.8]);
+
+  // Photos start on a new page; max 2 stacked per page, preserve aspect ratio.
   const photos = normalizePhotoObjects(s);
-  y += 8;
-  line('Field Photos', { bold: true, size: 12 });
+  if (photos.length) {
+    newPage();
+    drawHeader();
+    sectionTitle('Field Photos');
 
-  if (!photos.length) {
-    line('No photos attached.');
-  } else {
+    const slotsPerPage = 2;
+    const gap = 16;
+    const captionH = 12;
+    const slotH = ((bottom - y) - gap) / slotsPerPage;
+
     for (let i = 0; i < photos.length; i++) {
+      if (i > 0 && i % slotsPerPage === 0) {
+        newPage();
+        drawHeader();
+        sectionTitle('Field Photos (continued)');
+      }
+
       const p = photos[i];
-      line(`${i + 1}. ${p.name}`);
+      const slotIndex = i % slotsPerPage;
+      const top = y + slotIndex * (slotH + gap);
+      const boxY = top + captionH;
+      const boxH = slotH - captionH;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...colors.ink);
+      doc.text(`${i + 1}. ${p.name}`, margin, top + 8);
+
+      doc.setDrawColor(...colors.line);
+      doc.rect(margin, boxY, contentW, boxH);
+
       if (!p.dataUrl) {
-        line('Image data not available in this stored record.', { size: 9 });
-        y += 4;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...colors.muted);
+        doc.text('Image data not available in this stored record.', margin + 6, boxY + 14);
         continue;
       }
+
       try {
         const dims = await measureImage(p.dataUrl);
-        const ratio = dims.width > 0 ? (dims.height / dims.width) : 0.75;
-        const w = maxW;
-        const h = Math.min(260, Math.max(120, w * ratio));
-        ensureSpace(h + 12);
-        const format = p.dataUrl.includes('image/png') ? 'PNG' : 'JPEG';
-        doc.addImage(p.dataUrl, format, margin, y, w, h);
-        y += h + 10;
+        const iw = Math.max(1, dims.width);
+        const ih = Math.max(1, dims.height);
+        const scale = Math.min(contentW / iw, boxH / ih);
+        const drawW = iw * scale;
+        const drawH = ih * scale;
+        const dx = margin + (contentW - drawW) / 2;
+        const dy = boxY + (boxH - drawH) / 2;
+
+        let format = 'JPEG';
+        if (p.dataUrl.includes('image/png')) format = 'PNG';
+        else if (p.dataUrl.includes('image/webp')) format = 'WEBP';
+
+        doc.addImage(p.dataUrl, format, dx, dy, drawW, drawH);
       } catch {
-        line('Could not decode this image.', { size: 9 });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...colors.muted);
+        doc.text('Could not decode this image.', margin + 6, boxY + 14);
       }
     }
   }
