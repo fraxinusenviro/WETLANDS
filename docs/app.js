@@ -49,7 +49,7 @@ async function init() {
 
 function defaultSurvey() {
   const now = new Date();
-  const obj = { id: crypto.randomUUID(), timestamp: new Date().toISOString(), SiteID:"", LocaleName:"", Province:"", date: now.toISOString().slice(0,10), time: now.toTimeString().slice(0,5), observer:"", PLOT_ID:"", PLOT_TYPE:"", latitude:"", longitude:"", DistSoilYN:"", DistVegYN:"", DistHydroYN:"", ProbSoilYN:"", ProbVegYN:"", ProbHydroYN:"", ClimHydroNormalYN:"", CircNormalYN:"", SummaryHydroVegYN:"", SummaryHydricSoilYN:"", SummaryHydrologyYN:"", SummaryInWetlandYN:"", notes:"", RestrictiveLayer:"", RestrictiveLayerDepthCM:"", SurfaceWaterYN:"", SurfaceWaterDepthCM:"", WaterTableYN:"", WaterTableDepthCM:"", SaturationYN:"", SaturationDepthCM:"", HydricSoilIndicators:[], HydrologyPrimary:[], HydrologySecondary:[], photos:[] };
+  const obj = { id: makeId(), timestamp: new Date().toISOString(), SiteID:"", LocaleName:"", Province:"", date: now.toISOString().slice(0,10), time: now.toTimeString().slice(0,5), observer:"", PLOT_ID:"", PLOT_TYPE:"", latitude:"", longitude:"", DistSoilYN:"", DistVegYN:"", DistHydroYN:"", ProbSoilYN:"", ProbVegYN:"", ProbHydroYN:"", ClimHydroNormalYN:"", CircNormalYN:"", SummaryHydroVegYN:"", SummaryHydricSoilYN:"", SummaryHydrologyYN:"", SummaryInWetlandYN:"", notes:"", RestrictiveLayer:"", RestrictiveLayerDepthCM:"", SurfaceWaterYN:"", SurfaceWaterDepthCM:"", WaterTableYN:"", WaterTableDepthCM:"", SaturationYN:"", SaturationDepthCM:"", HydricSoilIndicators:[], HydrologyPrimary:[], HydrologySecondary:[], photos:[] };
   ["Tree","Shrub"].forEach(g => { for (let i=1;i<=6;i++) { obj[`${g}Sp${i}`]=""; obj[`${g}Sp${i}Cov`]=""; } });
   for (let i=1;i<=10;i++) { obj[`HerbSp${i}`]=""; obj[`HerbSp${i}Cov`]=""; }
   for (let h=1;h<=4;h++) ["ThickCM","Texture","Matrix","MatrixPC","Redox","RedoxPC","RedoxType","RedoxLoc"].forEach(s => obj[`SoilH${h}${s}`]="");
@@ -323,11 +323,30 @@ function bindActions() {
     e?.preventDefault?.();
     try {
       state.timestamp = new Date().toISOString();
-      state.id = crypto.randomUUID();
-      surveys.push(cloneData(state));
-      localStorage.setItem('wetlandSurveys', JSON.stringify(surveys));
+      state.id = makeId();
+
+      const fullSubmission = cloneData(state);
+      surveys.push(fullSubmission);
+      let downgradedPhotos = false;
+
+      try {
+        localStorage.setItem('wetlandSurveys', JSON.stringify(surveys));
+      } catch (err) {
+        if (!isQuotaExceeded(err)) throw err;
+
+        // Common failure mode: base64 photo blobs exceed localStorage quota.
+        surveys[surveys.length - 1] = stripPhotoData(fullSubmission);
+        localStorage.setItem('wetlandSurveys', JSON.stringify(surveys));
+        downgradedPhotos = true;
+      }
+
       localStorage.removeItem('wetlandCurrentDraft');
-      alert(`Survey submitted. Saved count: ${surveys.length}`);
+      if (downgradedPhotos) {
+        alert('Survey submitted, but photos were stored as metadata-only due to browser storage limits.');
+      } else {
+        alert(`Survey submitted. Saved count: ${surveys.length}`);
+      }
+
       state = defaultSurvey();
       renderFormPages();
       refreshDashboard();
@@ -336,7 +355,7 @@ function bindActions() {
       showView('home');
     } catch (err) {
       console.error('Submit failed:', err);
-      alert('Submit failed. Please try again.');
+      alert('Submit failed. Likely cause: browser storage limit reached. Try fewer/lower-res photos or clear older local submissions.');
     }
   };
 
@@ -467,9 +486,51 @@ function cloneData(obj) {
   if (typeof structuredClone === 'function') return structuredClone(obj);
   return JSON.parse(JSON.stringify(obj));
 }
+function makeId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `id_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+function isQuotaExceeded(err) {
+  return err && (
+    err.name === 'QuotaExceededError' ||
+    err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    err.code === 22 ||
+    err.code === 1014
+  );
+}
+function stripPhotoData(survey) {
+  return {
+    ...survey,
+    photos: (survey.photos || []).map(p => ({
+      name: p?.name || 'photo',
+      type: p?.type || '',
+      size: p?.size || 0,
+      ts: p?.ts || new Date().toISOString(),
+      stored: 'metadata-only'
+    }))
+  };
+}
 function queueAutosave(immediate=false) {
-  if (immediate) return localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state));
-  clearTimeout(autosaveTimer); autosaveTimer = setTimeout(() => localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state)), 350);
+  const save = () => {
+    try {
+      localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state));
+    } catch (err) {
+      if (isQuotaExceeded(err)) {
+        try {
+          const slim = stripPhotoData(state);
+          localStorage.setItem('wetlandCurrentDraft', JSON.stringify(slim));
+          console.warn('Draft exceeded storage quota; saved metadata-only photos.');
+        } catch (err2) {
+          console.error('Draft autosave failed:', err2);
+        }
+      } else {
+        console.error('Draft autosave failed:', err);
+      }
+    }
+  };
+  if (immediate) return save();
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(save, 350);
 }
 
 function toCSV(rows) {
