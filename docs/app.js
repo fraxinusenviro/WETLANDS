@@ -399,7 +399,7 @@ function renderSubmissions() {
 
   [...surveys].reverse().forEach(s => {
     const item = document.createElement('div'); item.className = 'submission-item';
-    item.innerHTML = `<h4>${s.SiteID || 'Untitled Site'} · ${s.PLOT_ID || 'No Plot ID'}</h4><p>${new Date(s.timestamp).toLocaleString()}</p><div class='row'><button data-view='${s.id}'>Preview</button><button data-load='${s.id}'>Load into form</button><button data-delete='${s.id}'>Delete</button><button data-export='geojson:${s.id}'>GeoJSON</button><button data-export='md:${s.id}'>Markdown</button><button data-export='csv:${s.id}'>CSV</button><button data-export='html:${s.id}'>HTML</button><button data-export='pdf:${s.id}'>PDF</button></div>`;
+    item.innerHTML = `<h4>${s.SiteID || 'Untitled Site'} · ${s.PLOT_ID || 'No Plot ID'}</h4><p>${new Date(s.timestamp).toLocaleString()}</p><div class='row'><button data-view='${s.id}'>Preview</button><button data-load='${s.id}'>Load into form</button><button data-delete='${s.id}'>Delete</button><button data-export='geojson:${s.id}'>GeoJSON</button><button data-export='md:${s.id}'>Markdown</button><button data-export='csv:${s.id}'>CSV</button><button data-export='html:${s.id}'>HTML</button><button data-export='pdf:${s.id}'>PDF</button><button data-export='pdf_form:${s.id}'>PDF (Form-Style)</button></div>`;
     list.appendChild(item);
   });
 
@@ -1237,6 +1237,223 @@ async function exportRecordPdf(s, base) {
   doc.save(`${base}.pdf`);
 }
 
+async function exportRecordPdfFormStyle(s, base) {
+  const jsPDF = await loadJsPdfCtor();
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 34;
+  const contentW = pageW - margin * 2;
+  const bottom = pageH - margin;
+  const logoDataUrl = await loadPdfLogoDataUrl();
+
+  let y = margin;
+  const newPage = () => { doc.addPage(); y = margin; };
+  const ensureSpace = (h = 12) => { if (y + h > bottom) newPage(); };
+
+  const sectionBar = (title) => {
+    ensureSpace(24);
+    doc.setFillColor(0, 0, 0);
+    doc.rect(margin, y, contentW, 14, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(String(title).toUpperCase(), margin + 4, y + 9.5);
+    y += 22;
+  };
+
+  const drawKV = (rows, leftRatio = 0.42) => {
+    const rowH = 12;
+    const leftW = contentW * leftRatio;
+    const rightW = contentW - leftW;
+    ensureSpace(rows.length * rowH + 4);
+    rows.forEach(([k, v]) => {
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(margin, y, contentW, rowH);
+      doc.line(margin + leftW, y, margin + leftW, y + rowH);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(k || '—'), margin + 3, y + 8.5);
+      doc.setFont('helvetica', 'normal');
+      const clipped = doc.splitTextToSize(String(v || '—'), rightW - 6)[0] || '—';
+      doc.text(clipped, margin + leftW + 3, y + 8.5);
+      y += rowH;
+    });
+    y += 6;
+  };
+
+  const drawTable = (headers, rows, widths) => {
+    const rowH = 12;
+    const headerH = 14;
+    const totalH = headerH + rows.length * rowH + 4;
+    ensureSpace(totalH);
+
+    doc.setFillColor(226, 232, 240);
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(margin, y, contentW, headerH, 'FD');
+
+    let cx = margin;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    headers.forEach((h, i) => {
+      doc.text(String(h), cx + 3, y + 9);
+      cx += widths[i];
+      if (i < headers.length - 1) doc.line(cx, y, cx, y + headerH + rows.length * rowH);
+    });
+
+    y += headerH;
+    rows.forEach((r) => {
+      doc.rect(margin, y, contentW, rowH);
+      let rx = margin;
+      r.forEach((cell, i) => {
+        const txt = doc.splitTextToSize(String(cell ?? '—'), widths[i] - 6)[0] || '—';
+        doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
+        doc.text(txt, rx + 3, y + 8.5);
+        rx += widths[i];
+      });
+      y += rowH;
+    });
+    y += 6;
+  };
+
+  // Header block
+  if (logoDataUrl) {
+    try { doc.addImage(logoDataUrl, 'PNG', margin, y, 24, 24); } catch {}
+  }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(15, 23, 42);
+  doc.text('WETLAND DELINEATION DATA FORM – NOVA SCOTIA', margin + 30, y + 12);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(71, 85, 105);
+  doc.text('Adapted workflow output for field reporting (aesthetic form-style export)', margin + 30, y + 22);
+  doc.text(`Generated ${new Date().toLocaleString()}`, pageW - margin, y + 12, { align: 'right' });
+  y += 32;
+  doc.setDrawColor(203, 213, 225);
+  doc.line(margin, y, pageW - margin, y);
+  y += 10;
+
+  sectionBar('Project / Site Metadata');
+  drawKV([
+    ['Project / Site', s.SiteID || '—'],
+    ['Municipality / County', s.LocaleName || '—'],
+    ['Sampling Date', s.date || '—'],
+    ['Sampling Time', s.time || '—'],
+    ['Investigator(s)', s.observer || '—'],
+    ['Sampling Point', s.PLOT_ID || '—'],
+    ['Plot Type', s.PLOT_TYPE || '—'],
+    ['Province', s.Province || '—'],
+    ['Latitude', s.latitude || '—'],
+    ['Longitude', s.longitude || '—']
+  ]);
+
+  sectionBar('Site Conditions');
+  drawKV([
+    ['Typical climatic/hydrologic conditions for this time of year?', s.ClimHydroNormalYN || '—'],
+    ['Are normal circumstances present?', s.CircNormalYN || '—'],
+    ['Vegetation significantly disturbed?', s.DistVegYN || '—'],
+    ['Soil significantly disturbed?', s.DistSoilYN || '—'],
+    ['Hydrology significantly disturbed?', s.DistHydroYN || '—'],
+    ['Vegetation naturally problematic?', s.ProbVegYN || '—'],
+    ['Soil naturally problematic?', s.ProbSoilYN || '—'],
+    ['Hydrology naturally problematic?', s.ProbHydroYN || '—']
+  ], 0.62);
+
+  sectionBar('Summary of Findings');
+  drawKV([
+    ['Hydrophytic Vegetation Present?', s.SummaryHydroVegYN || '—'],
+    ['Hydric Soil Present?', s.SummaryHydricSoilYN || '—'],
+    ['Wetland Hydrology Present?', s.SummaryHydrologyYN || '—'],
+    ['Is the sampled area within a wetland?', s.SummaryInWetlandYN || '—']
+  ], 0.62);
+
+  const vegRows = [
+    ...speciesRows(s, 'Tree', 6).map(r => ['Tree', r[0], r[1]]),
+    ...speciesRows(s, 'Shrub', 6).map(r => ['Shrub', r[0], r[1]]),
+    ...speciesRows(s, 'Herb', 10).map(r => ['Herb', r[0], r[1]])
+  ];
+  sectionBar('Vegetation');
+  drawTable(['Stratum', 'Species', '% Cover'], vegRows, [contentW * 0.16, contentW * 0.62, contentW * 0.22]);
+
+  sectionBar('Soils');
+  drawTable(['Hor', 'Thk (cm)', 'Texture', 'Matrix', 'M%', 'Redox', 'R%', 'Type', 'Loc'], soilRows(s),
+    [contentW*0.07,contentW*0.1,contentW*0.12,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.15]);
+  drawKV([
+    ['Hydric Soil Indicators', (s.HydricSoilIndicators || []).join(', ') || '—'],
+    ['Restrictive Layer', s.RestrictiveLayer || '—'],
+    ['Restrictive Layer Depth (cm)', s.RestrictiveLayerDepthCM || '—']
+  ], 0.38);
+
+  sectionBar('Hydrology');
+  drawKV([
+    ['Surface Water Present?', s.SurfaceWaterYN || '—'],
+    ['Surface Water Depth (cm)', s.SurfaceWaterDepthCM || '—'],
+    ['Water Table Present?', s.WaterTableYN || '—'],
+    ['Water Table Depth (cm)', s.WaterTableDepthCM || '—'],
+    ['Saturation Present?', s.SaturationYN || '—'],
+    ['Saturation Depth (cm)', s.SaturationDepthCM || '—'],
+    ['Primary Indicators (minimum one expected)', (s.HydrologyPrimary || []).join(', ') || '—'],
+    ['Secondary Indicators (minimum two expected)', (s.HydrologySecondary || []).join(', ') || '—']
+  ], 0.5);
+
+  sectionBar('Remarks');
+  drawKV([
+    ['Notes', s.notes || '—']
+  ], 0.18);
+
+  const photos = normalizePhotoObjects(s);
+  if (photos.length) {
+    newPage();
+    sectionBar('Field Photos');
+
+    const gap = 16;
+    const captionH = 12;
+    const slotH = ((bottom - y) - gap) / 2;
+
+    for (let i = 0; i < photos.length; i++) {
+      if (i > 0 && i % 2 === 0) {
+        newPage();
+        sectionBar('Field Photos (continued)');
+      }
+      const p = photos[i];
+      const slot = i % 2;
+      const top = y + slot * (slotH + gap);
+      const boxY = top + captionH;
+      const boxH = slotH - captionH;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${i + 1}. ${p.name}`, margin, top + 8);
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(margin, boxY, contentW, boxH);
+
+      if (!p.dataUrl) continue;
+      try {
+        const normalizedUrl = await normalizePhotoForPdf(p.dataUrl);
+        const dims = await measureImage(normalizedUrl);
+        const iw = Math.max(1, dims.width);
+        const ih = Math.max(1, dims.height);
+        const scale = Math.min(contentW / iw, boxH / ih);
+        const w = iw * scale;
+        const h = ih * scale;
+        const dx = margin + (contentW - w) / 2;
+        const dy = boxY + (boxH - h) / 2;
+        let format = 'JPEG';
+        if (normalizedUrl.includes('image/png')) format = 'PNG';
+        else if (normalizedUrl.includes('image/webp')) format = 'WEBP';
+        doc.addImage(normalizedUrl, format, dx, dy, w, h);
+      } catch {}
+    }
+  }
+
+  doc.save(`${base}_form_style.pdf`);
+}
+
 async function exportRecord(fmt, raw) {
   const full = cloneData(raw);
   const clean = exportCleanRecord(raw);
@@ -1266,6 +1483,15 @@ async function exportRecord(fmt, raw) {
       alert('PDF export failed in this browser. Downloading printable HTML fallback.');
       const payload = recordHTML(full);
       return smartExport({ content: payload, filename: `${base}_printable.html`, mime: 'text/html;charset=utf-8' });
+    }
+  }
+  if (fmt === 'pdf_form') {
+    try {
+      return await exportRecordPdfFormStyle(full, base);
+    } catch (err) {
+      console.error('Form-style PDF export failed:', err);
+      alert('Form-style PDF export failed in this browser. Falling back to standard PDF.');
+      return await exportRecordPdf(full, base);
     }
   }
 }

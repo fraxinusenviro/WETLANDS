@@ -56,7 +56,8 @@ WETLANDS provides a practical, offline-friendly form workflow for:
   - GeoJSON
   - Markdown
   - HTML report
-  - **PDF export path (download-only):** exports a printable HTML file (`*_printable.html`) for local “Save as PDF”
+  - PDF (Aesthetic report)
+  - PDF (Form-Style, NS-reference-inspired layout)
 
 ### Reporting style
 
