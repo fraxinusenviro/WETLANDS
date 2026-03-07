@@ -1,0 +1,12 @@
+{
+  "name": "wetlands-1.1-web",
+  "version": "1.0.0",
+  "description": "HTML/JS refactor of the Swift Playgrounds app in `WETLANDS 1.1.zip`.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

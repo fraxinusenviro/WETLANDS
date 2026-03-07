@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WETLANDS 1.1 (Web)</title>
+  <meta name="theme-color" content="#0f1115" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css?v=13" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <img src="assets/fraxinus-logo.svg" alt="Fraxinus" class="brand-logo" />
+      <div>
+        <h1>WETLANDS 1.1</h1>
+        <p>Fraxinus Wetland Control Plot Survey</p>
+      </div>
+    </div>
+    <button id="btn-home" class="ghost">Dashboard</button>
+  </header>
+
+  <main>
+    <section id="view-home" class="view active">
+      <h2>Survey Dashboard</h2>
+      <p class="muted">Start a new wetland form or reopen previous submissions.</p>
+      <div class="cards">
+        <button class="launch-card" id="btn-launch-new">
+          <strong>Launch New Form</strong>
+          <span>Create a fresh control-plot survey.</span>
+        </button>
+        <button class="launch-card" id="btn-open-submissions">
+          <strong>View Submitted Forms</strong>
+          <span>Browse, inspect, and reload prior submissions.</span>
+        </button>
+      </div>
+      <div class="stats" id="dashboard-stats"></div>
+    </section>
+
+    <section id="view-form" class="view">
+      <nav class="tabs" id="tabs"></nav>
+      <div class="tab-nav">
+        <button id="btn-prev-tab">◀ Prev</button>
+        <span id="tab-status">Metadata (1/4)</span>
+        <button id="btn-next-tab">Next ▶</button>
+      </div>
+
+      <section class="page active" data-page="metadata">
+        <h2>Metadata</h2>
+        <div class="grid two" id="metadata-fields"></div>
+        <div class="actions">
+          <button id="btn-location">Use Device Location</button>
+        </div>
+      </section>
+
+      <section class="page" data-page="vegetation">
+        <h2>Vegetation</h2>
+        <div id="vegetation-fields"></div>
+      </section>
+
+      <section class="page" data-page="hydrology">
+        <h2>Hydrology</h2>
+        <div class="grid two" id="hydrology-fields"></div>
+      </section>
+
+      <section class="page" data-page="soils">
+        <h2>Soils</h2>
+        <div id="soil-fields"></div>
+        <div class="actions">
+          <button class="primary" id="btn-submit">Submit Survey</button>
+        </div>
+      </section>
+    </section>
+
+    <section id="view-submissions" class="view">
+      <h2>Submitted Forms</h2>
+      <div class="submissions-layout">
+        <div>
+          <div class="actions"><button id="btn-refresh-submissions">Refresh</button></div>
+          <div id="submission-list" class="submission-list"></div>
+        </div>
+        <div class="card" id="submission-detail">
+          <p class="muted">Select a submission to preview details.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js?v=13"></script>
+</body>
+</html>
