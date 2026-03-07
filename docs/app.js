@@ -900,6 +900,45 @@ async function measureImage(dataUrl) {
   });
 }
 
+let pdfLogoDataUrlCache = null;
+async function loadPdfLogoDataUrl() {
+  if (pdfLogoDataUrlCache) return pdfLogoDataUrlCache;
+  try {
+    const logoUrl = new URL('icon-192.png', window.location.href).href;
+    const res = await fetch(logoUrl);
+    const blob = await res.blob();
+    const dataUrl = await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = () => reject(fr.error || new Error('Failed to read logo blob'));
+      fr.readAsDataURL(blob);
+    });
+    pdfLogoDataUrlCache = String(dataUrl || '');
+    return pdfLogoDataUrlCache;
+  } catch {
+    return '';
+  }
+}
+
+async function normalizePhotoForPdf(dataUrl) {
+  if (!dataUrl) return '';
+  try {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+
+    if (typeof createImageBitmap === 'function') {
+      const bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+      const canvas = document.createElement('canvas');
+      canvas.width = bmp.width;
+      canvas.height = bmp.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(bmp, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.92);
+    }
+  } catch {}
+  return dataUrl;
+}
+
 async function exportRecordPdf(s, base) {
   const jsPDF = await loadJsPdfCtor();
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
@@ -909,13 +948,16 @@ async function exportRecordPdf(s, base) {
   const margin = 36;
   const contentW = pageW - margin * 2;
   const bottom = pageH - margin;
+  const logoDataUrl = await loadPdfLogoDataUrl();
 
   const colors = {
     ink: [15, 23, 42],
     muted: [71, 85, 105],
     line: [203, 213, 225],
     head: [226, 232, 240],
-    accent: [11, 107, 80]
+    accent: [11, 107, 80],
+    black: [0, 0, 0],
+    white: [255, 255, 255]
   };
 
   let y = margin;
@@ -924,30 +966,37 @@ async function exportRecordPdf(s, base) {
   const ensureSpace = (need = 12) => { if (y + need > bottom) newPage(); };
 
   const drawHeader = () => {
-    ensureSpace(56);
+    ensureSpace(60);
+    if (logoDataUrl) {
+      try { doc.addImage(logoDataUrl, 'PNG', margin, y + 2, 24, 24); } catch {}
+    }
+
     doc.setDrawColor(...colors.line);
     doc.line(margin, y + 40, pageW - margin, y + 40);
 
     doc.setTextColor(...colors.ink);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(15);
-    doc.text('Wetland Delineation Report', margin, y + 16);
+    doc.text('Wetland Delineation Report', margin + 30, y + 16);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...colors.muted);
-    doc.text('Nova Scotia Field Data Form', margin, y + 30);
+    doc.text('Nova Scotia Field Data Form', margin + 30, y + 30);
     doc.text(`Generated ${new Date().toLocaleString()}`, pageW - margin, y + 16, { align: 'right' });
     y += 52;
   };
 
   const sectionTitle = (title) => {
-    ensureSpace(18);
+    const barH = 14;
+    ensureSpace(barH + 10);
+    doc.setFillColor(...colors.black);
+    doc.rect(margin, y, contentW, barH, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...colors.accent);
-    doc.text(title, margin, y);
-    y += 10;
+    doc.setFontSize(8);
+    doc.setTextColor(...colors.white);
+    doc.text(String(title || '').toUpperCase(), margin + 4, y + 9.5);
+    y += barH + 8;
   };
 
   const drawTable = (title, headers, rows, widths) => {
@@ -1097,7 +1146,8 @@ async function exportRecordPdf(s, base) {
       }
 
       try {
-        const dims = await measureImage(p.dataUrl);
+        const normalizedUrl = await normalizePhotoForPdf(p.dataUrl);
+        const dims = await measureImage(normalizedUrl);
         const iw = Math.max(1, dims.width);
         const ih = Math.max(1, dims.height);
         const scale = Math.min(contentW / iw, boxH / ih);
@@ -1107,10 +1157,10 @@ async function exportRecordPdf(s, base) {
         const dy = boxY + (boxH - drawH) / 2;
 
         let format = 'JPEG';
-        if (p.dataUrl.includes('image/png')) format = 'PNG';
-        else if (p.dataUrl.includes('image/webp')) format = 'WEBP';
+        if (normalizedUrl.includes('image/png')) format = 'PNG';
+        else if (normalizedUrl.includes('image/webp')) format = 'WEBP';
 
-        doc.addImage(p.dataUrl, format, dx, dy, drawW, drawH);
+        doc.addImage(normalizedUrl, format, dx, dy, drawW, drawH);
       } catch {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
