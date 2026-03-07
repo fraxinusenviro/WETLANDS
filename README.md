@@ -41,8 +41,9 @@ WETLANDS provides a practical, offline-friendly form workflow for:
 
 ### Local persistence
 
-- Draft autosave + restore via `localStorage` (`wetlandCurrentDraft`)
-- Submitted surveys stored locally via `localStorage` (`wetlandSurveys`)
+- Draft autosave + restore via **IndexedDB** (`wetlandCurrentDraft`)
+- Submitted surveys stored locally via **IndexedDB** (`wetlandSurveys`)
+- One-time legacy migration from prior `localStorage` keys is included
 - Submission dashboard for preview, reload to form, delete, and per-record export
 
 ### Export options

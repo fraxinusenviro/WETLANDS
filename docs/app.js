@@ -15,9 +15,15 @@ const metadataFields = [
   ["ClimHydroNormalYN", "select", yesNo], ["CircNormalYN", "select", yesNo], ["SummaryHydroVegYN", "select", yesNo], ["SummaryHydricSoilYN", "select", yesNo], ["SummaryHydrologyYN", "select", yesNo], ["SummaryInWetlandYN", "select", yesNo]
 ];
 
+const DB_NAME = 'wetlands-app-db';
+const DB_VERSION = 1;
+const KV_STORE = 'kv';
+const DRAFT_KEY = 'wetlandCurrentDraft';
+const SURVEYS_KEY = 'wetlandSurveys';
+
 let speciesList = ["ACERrubr", "PICErube", "QUERrubr", "KALMangu", "VIBUcass", "PTERaqui"];
-let state = loadDraft() || defaultSurvey();
-let surveys = readStore("wetlandSurveys", []);
+let state = defaultSurvey();
+let surveys = [];
 let activeTabIndex = 0;
 let deferredPrompt = null;
 let autosaveTimer = null;
@@ -37,12 +43,16 @@ let soilUi = {
 };
 
 async function init() {
+  await migrateLegacyLocalStorage();
+  surveys = await loadSurveys();
+  state = (await loadDraft()) || defaultSurvey();
+
   await loadSpecies();
   buildSpeciesDatalist();
   buildTabs();
   renderFormPages();
   bindActions();
-  refreshDashboard();
+  await refreshDashboard();
   renderSubmissions();
   showView("home");
 }
@@ -297,10 +307,10 @@ function checkGroup(key, options) {
 }
 
 function bindActions() {
-  document.getElementById('btn-home').onclick = () => { refreshDashboard(); showView('home'); };
+  document.getElementById('btn-home').onclick = async () => { await refreshDashboard(); showView('home'); };
   document.getElementById('btn-launch-new').onclick = () => { state = defaultSurvey(); renderFormPages(); queueAutosave(true); showView('form'); };
-  document.getElementById('btn-open-submissions').onclick = () => { renderSubmissions(); showView('submissions'); };
-  document.getElementById('btn-refresh-submissions').onclick = () => renderSubmissions();
+  document.getElementById('btn-open-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); showView('submissions'); };
+  document.getElementById('btn-refresh-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); };
 
   document.getElementById('btn-prev-tab').onclick = () => setActiveTab(activeTabIndex - 1);
   document.getElementById('btn-next-tab').onclick = () => setActiveTab(activeTabIndex + 1);
@@ -319,7 +329,7 @@ function bindActions() {
     }
   });
 
-  document.getElementById('btn-submit').onclick = (e) => {
+  document.getElementById('btn-submit').onclick = async (e) => {
     e?.preventDefault?.();
     try {
       state.timestamp = new Date().toISOString();
@@ -330,17 +340,16 @@ function bindActions() {
       let downgradedPhotos = false;
 
       try {
-        localStorage.setItem('wetlandSurveys', JSON.stringify(surveys));
+        await saveSurveys(surveys);
       } catch (err) {
         if (!isQuotaExceeded(err)) throw err;
 
-        // Common failure mode: base64 photo blobs exceed localStorage quota.
         surveys[surveys.length - 1] = stripPhotoData(fullSubmission);
-        localStorage.setItem('wetlandSurveys', JSON.stringify(surveys));
+        await saveSurveys(surveys);
         downgradedPhotos = true;
       }
 
-      localStorage.removeItem('wetlandCurrentDraft');
+      await clearDraft();
       if (downgradedPhotos) {
         alert('Survey submitted, but photos were stored as metadata-only due to browser storage limits.');
       } else {
@@ -349,7 +358,7 @@ function bindActions() {
 
       state = defaultSurvey();
       renderFormPages();
-      refreshDashboard();
+      await refreshDashboard();
       renderSubmissions();
       queueAutosave(true);
       showView('home');
@@ -362,22 +371,27 @@ function bindActions() {
   const resetBtn = document.getElementById('btn-reset');
   if (resetBtn) resetBtn.onclick = () => { if (!confirm('Reset current form?')) return; state = defaultSurvey(); renderFormPages(); queueAutosave(true); };
   const saveBtn = document.getElementById('btn-save-json');
-  if (saveBtn) saveBtn.onclick = () => { localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state)); alert('Draft saved.'); };
+  if (saveBtn) saveBtn.onclick = async () => { await saveDraft(state); alert('Draft saved.'); };
   const csvBtn = document.getElementById('btn-csv');
-  if (csvBtn) csvBtn.onclick = () => surveys.length
-    ? smartExport({ content: toCSV(surveys), filename: `Survey_${dateStamp()}.csv`, mime: 'text/csv;charset=utf-8', preview: 'text' })
-    : alert('No submitted surveys.');
+  if (csvBtn) csvBtn.onclick = async () => {
+    surveys = await loadSurveys();
+    return surveys.length
+      ? smartExport({ content: toCSV(surveys), filename: `Survey_${dateStamp()}.csv`, mime: 'text/csv;charset=utf-8' })
+      : alert('No submitted surveys.');
+  };
   const gjBtn = document.getElementById('btn-geojson');
-  if (gjBtn) gjBtn.onclick = () => surveys.length
-    ? smartExport({ content: JSON.stringify(toGeoJSON(surveys), null, 2), filename: `Survey_${dateStamp()}.geojson`, mime: 'application/geo+json', preview: 'text' })
-    : alert('No submitted surveys.');
+  if (gjBtn) gjBtn.onclick = async () => {
+    surveys = await loadSurveys();
+    return surveys.length
+      ? smartExport({ content: JSON.stringify(toGeoJSON(surveys), null, 2), filename: `Survey_${dateStamp()}.geojson`, mime: 'application/geo+json' })
+      : alert('No submitted surveys.');
+  };
 
   const installBtn = document.getElementById('btn-install');
   if (installBtn) installBtn.onclick = async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; installBtn.hidden = true; };
 }
 
 function renderSubmissions() {
-  surveys = readStore('wetlandSurveys', []);
   const list = document.getElementById('submission-list');
   const detail = document.getElementById('submission-detail');
   list.innerHTML = '';
@@ -395,18 +409,18 @@ function renderSubmissions() {
     detail.innerHTML = `<h3>${s.SiteID || 'Untitled Site'}</h3><p class='muted'>${new Date(s.timestamp).toLocaleString()}</p><div>${previewKeys.map(k => `<p><strong>${displayLabel(k)}:</strong> ${s[k] ?? ''}</p>`).join('')}<p><strong>Photos:</strong> ${(s.photos||[]).map(p=>p.name).join(', ') || '—'}</p></div>`;
   });
 
-  list.querySelectorAll('button[data-load]').forEach(b => b.onclick = () => {
+  list.querySelectorAll('button[data-load]').forEach(b => b.onclick = async () => {
     const id = b.dataset.load; const s = surveys.find(x => x.id === id); if (!s) return;
-    state = cloneData(s); localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state));
+    state = cloneData(s); await saveDraft(state);
     renderFormPages(); showView('form'); setActiveTab(0);
   });
 
-  list.querySelectorAll('button[data-delete]').forEach(b => b.onclick = () => {
+  list.querySelectorAll('button[data-delete]').forEach(b => b.onclick = async () => {
     const id = b.dataset.delete;
     if (!confirm('Delete this submission?')) return;
     surveys = surveys.filter(x => x.id !== id);
-    localStorage.setItem('wetlandSurveys', JSON.stringify(surveys));
-    renderSubmissions(); refreshDashboard();
+    await saveSurveys(surveys);
+    renderSubmissions(); await refreshDashboard();
   });
 
   list.querySelectorAll('button[data-export]').forEach(b => b.onclick = () => {
@@ -417,9 +431,9 @@ function renderSubmissions() {
   });
 }
 
-function refreshDashboard() {
+async function refreshDashboard() {
   const stats = document.getElementById('dashboard-stats');
-  const draft = loadDraft();
+  const draft = await loadDraft();
   stats.innerHTML = [
     `<div class='card'><h3>${surveys.length}</h3><p class='muted'>Submitted Forms</p></div>`,
     `<div class='card'><h3>${draft ? 'Yes' : 'No'}</h3><p class='muted'>Draft Available</p></div>`,
@@ -480,8 +494,6 @@ function displayLabel(key) {
   return key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\bYN\b/g, '?');
 }
 
-function readStore(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { localStorage.removeItem(key); return fallback; } }
-function loadDraft() { return readStore('wetlandCurrentDraft', null); }
 function cloneData(obj) {
   if (typeof structuredClone === 'function') return structuredClone(obj);
   return JSON.parse(JSON.stringify(obj));
@@ -510,15 +522,90 @@ function stripPhotoData(survey) {
     }))
   };
 }
+
+let dbPromise = null;
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(KV_STORE)) db.createObjectStore(KV_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+function idbRequest(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbGet(key, fallback = null) {
+  const db = await openDb();
+  const tx = db.transaction(KV_STORE, 'readonly');
+  const val = await idbRequest(tx.objectStore(KV_STORE).get(key));
+  return val ?? fallback;
+}
+async function idbSet(key, value) {
+  const db = await openDb();
+  const tx = db.transaction(KV_STORE, 'readwrite');
+  tx.objectStore(KV_STORE).put(value, key);
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+async function idbDelete(key) {
+  const db = await openDb();
+  const tx = db.transaction(KV_STORE, 'readwrite');
+  tx.objectStore(KV_STORE).delete(key);
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function migrateLegacyLocalStorage() {
+  try {
+    const existingDraft = await idbGet(DRAFT_KEY, null);
+    if (existingDraft == null) {
+      const rawDraft = localStorage.getItem(DRAFT_KEY);
+      if (rawDraft) {
+        try { await idbSet(DRAFT_KEY, JSON.parse(rawDraft)); } catch {}
+      }
+    }
+    const existingSurveys = await idbGet(SURVEYS_KEY, null);
+    if (existingSurveys == null) {
+      const rawSurveys = localStorage.getItem(SURVEYS_KEY);
+      if (rawSurveys) {
+        try { await idbSet(SURVEYS_KEY, JSON.parse(rawSurveys)); } catch {}
+      }
+    }
+  } catch (err) {
+    console.warn('Legacy migration skipped:', err);
+  }
+}
+
+async function loadDraft() { return await idbGet(DRAFT_KEY, null); }
+async function loadSurveys() { return await idbGet(SURVEYS_KEY, []); }
+async function saveDraft(draft) { await idbSet(DRAFT_KEY, draft); }
+async function saveSurveys(rows) { await idbSet(SURVEYS_KEY, rows); }
+async function clearDraft() { await idbDelete(DRAFT_KEY); }
+
 function queueAutosave(immediate=false) {
-  const save = () => {
+  const save = async () => {
     try {
-      localStorage.setItem('wetlandCurrentDraft', JSON.stringify(state));
+      await saveDraft(state);
     } catch (err) {
       if (isQuotaExceeded(err)) {
         try {
           const slim = stripPhotoData(state);
-          localStorage.setItem('wetlandCurrentDraft', JSON.stringify(slim));
+          await saveDraft(slim);
           console.warn('Draft exceeded storage quota; saved metadata-only photos.');
         } catch (err2) {
           console.error('Draft autosave failed:', err2);
@@ -530,7 +617,7 @@ function queueAutosave(immediate=false) {
   };
   if (immediate) return save();
   clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(save, 350);
+  autosaveTimer = setTimeout(() => { void save(); }, 350);
 }
 
 function toCSV(rows) {
