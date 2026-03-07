@@ -16,6 +16,11 @@ HTML/JS refactor of the Swift Playgrounds app in `WETLANDS 1.1.zip`.
 - GeoJSON export (`Point` using longitude/latitude)
 - PWA installability (`manifest.webmanifest` + `service-worker.js`)
 
+## Project structure
+
+- `docs/` → deployable static web app (GitHub Pages source)
+- `archive/screenshots/` → internal design snapshots and legacy artifacts
+
 ## Run locally
 From this folder:
 
@@ -24,7 +29,7 @@ python3 -m http.server 8080
 ```
 
 Then open:
-`http://localhost:8080`
+`http://localhost:8080/docs/`
 
 ## Notes
 - This is a clean web baseline, not a 1:1 pixel clone of SwiftUI.
