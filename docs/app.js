@@ -531,6 +531,13 @@ function speciesSearchKey(rec) {
   return [rec.mcode, rec.elcode, rec.commonName, rec.scientificName].filter(Boolean).join(' ').toLowerCase();
 }
 
+function extractScientificName(text) {
+  const raw = String(text || '');
+  const m = raw.match(/\(([^)]+)\)/);
+  if (m && m[1]) return m[1].trim();
+  return raw.trim() || '—';
+}
+
 function searchPlantReference(q) {
   const query = String(q || '').trim().toLowerCase();
   if (!query) return plantReferenceRecords.slice(0, 100);
@@ -1351,7 +1358,8 @@ async function exportRecordPdf(s, base) {
         const text = String(cell ?? '—');
         const clipped = doc.splitTextToSize(text, colW[i] - 6)[0] || '—';
         const makeBold = opts.boldLeftColumn && i === 0;
-        doc.setFont('helvetica', makeBold ? 'bold' : 'normal');
+        const makeItalic = Array.isArray(opts.italicCols) && opts.italicCols.includes(i);
+        doc.setFont('helvetica', makeBold ? 'bold' : (makeItalic ? 'italic' : 'normal'));
         doc.setFontSize(fontSize);
         doc.setTextColor(...colors.ink);
         doc.text(clipped, rx + 3, ry + 8.5);
@@ -1453,12 +1461,12 @@ async function exportRecordPdf(s, base) {
   const vegAuto = autoDominantSet(vegEntries);
   const vegRows = vegEntries.map(e => [
     e.group,
-    e.species || '—',
+    extractScientificName(e.species || '—'),
     e.status || '—',
     e.cover || '—',
     vegAuto.has(`${e.group}:${e.i}`) ? 'Y' : 'N'
   ]);
-  drawTable('Vegetation', ['Layer', 'Species', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—']], [contentW * 0.12, contentW * 0.48, contentW * 0.14, contentW * 0.16, contentW * 0.10]);
+  drawTable('Vegetation', ['Layer', 'Scientific Name', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—']], [contentW * 0.12, contentW * 0.48, contentW * 0.14, contentW * 0.16, contentW * 0.10], { italicCols: [1] });
 
   const vMetrics = vegetationMetricsFromSurvey(s);
   drawTable('Vegetation Indices', ['Metric', 'Value'], [
@@ -1467,6 +1475,17 @@ async function exportRecordPdf(s, base) {
     ['Prevalence Index (B/A)', vMetrics.prevalenceIndex.toFixed(2)],
     ['Prevalence Pass (≤3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
   ], [contentW * 0.45, contentW * 0.55], { showHeader: false, boldLeftColumn: true });
+
+  ensureSpace(28);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(...colors.muted);
+  const fp1 = 'Fine print: Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): rank by absolute cover, include species cumulatively exceeding 50% of stratum cover, plus any additional species at ≥20% of stratum cover.';
+  const fp2 = 'Prevalence Index = (OBL×1 + FACW×2 + FAC×3 + FACU×4 + UPL×5) / (total vegetative cover across those indicator classes). Lower values indicate greater hydrophytic affinity.';
+  doc.text(doc.splitTextToSize(fp1, contentW), margin, y + 8);
+  y += 14;
+  doc.text(doc.splitTextToSize(fp2, contentW), margin, y + 8);
+  y += 18;
 
   const soilsRows = soilRows(s);
   drawTable('Hydric Soils', ['Hor','Thk','Texture','Matrix','M%','Redox','R%','Type','Loc'], soilsRows,
@@ -1604,7 +1623,7 @@ async function exportRecordPdfFormStyle(s, base) {
     y += 6;
   };
 
-  const drawTable = (headers, rows, widths) => {
+  const drawTable = (headers, rows, widths, opts = {}) => {
     const rowH = 12;
     const headerH = 14;
     const totalH = headerH + rows.length * rowH + 4;
@@ -1630,7 +1649,8 @@ async function exportRecordPdfFormStyle(s, base) {
       let rx = margin;
       r.forEach((cell, i) => {
         const txt = doc.splitTextToSize(String(cell ?? '—'), widths[i] - 6)[0] || '—';
-        doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
+        const italic = Array.isArray(opts.italicCols) && opts.italicCols.includes(i);
+        doc.setFont('helvetica', i === 0 ? 'bold' : (italic ? 'italic' : 'normal'));
         doc.text(txt, rx + 3, y + 8.5);
         rx += widths[i];
       });
@@ -1693,9 +1713,9 @@ async function exportRecordPdfFormStyle(s, base) {
 
   const vegEntries = vegetationEntriesFromSurvey(s);
   const vegAuto = autoDominantSet(vegEntries);
-  const vegRows = vegEntries.map(e => [e.group, e.species || '—', e.status || '—', e.cover || '—', vegAuto.has(`${e.group}:${e.i}`) ? 'Y' : 'N']);
+  const vegRows = vegEntries.map(e => [e.group, extractScientificName(e.species || '—'), e.status || '—', e.cover || '—', vegAuto.has(`${e.group}:${e.i}`) ? 'Y' : 'N']);
   sectionBar('Vegetation');
-  drawTable(['Stratum', 'Species', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—'],], [contentW * 0.14, contentW * 0.46, contentW * 0.14, contentW * 0.16, contentW * 0.10]);
+  drawTable(['Stratum', 'Scientific Name', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—'],], [contentW * 0.14, contentW * 0.46, contentW * 0.14, contentW * 0.16, contentW * 0.10], { italicCols: [1] });
 
   const vMetrics = vegetationMetricsFromSurvey(s);
   drawKV([
@@ -1704,6 +1724,17 @@ async function exportRecordPdfFormStyle(s, base) {
     ['Prevalence Index (B/A)', vMetrics.prevalenceIndex.toFixed(2)],
     ['Prevalence Pass (≤3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
   ], 0.45);
+
+  ensureSpace(28);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(71, 85, 105);
+  const fp1 = 'Fine print: Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): include species cumulatively exceeding 50% of stratum cover, plus any additional species at ≥20% of stratum cover.';
+  const fp2 = 'Prevalence Index = (OBL×1 + FACW×2 + FAC×3 + FACU×4 + UPL×5) / total cover in those indicator classes.';
+  doc.text(doc.splitTextToSize(fp1, contentW), margin, y + 8);
+  y += 14;
+  doc.text(doc.splitTextToSize(fp2, contentW), margin, y + 8);
+  y += 18;
 
   sectionBar('Soils');
   drawTable(['Hor', 'Thk (cm)', 'Texture', 'Matrix', 'M%', 'Redox', 'R%', 'Type', 'Loc'], soilRows(s),
