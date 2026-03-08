@@ -923,7 +923,7 @@ function munsellDescriptionFor(input) {
 }
 
 function munsellDisplay(input) {
-  const code = normalizeMunsellCode(input).replace(/\s*(\([^)]*\)|\[[^\]]*\])\s*$/, '');
+  const code = normalizeMunsellCode(input).replace(/(?:\s*(\([^)]*\)|\[[^\]]*\]))+\s*$/, '');
   const desc = munsellDescriptionFor(code);
   return desc ? `${code} [${desc}]` : code;
 }
@@ -1303,7 +1303,7 @@ function speciesRows(s, group, n) {
 }
 
 function munsellDisplayMultiline(input) {
-  const code = normalizeMunsellCode(input).replace(/\s*(\([^)]*\)|\[[^\]]*\])\s*$/, '');
+  const code = normalizeMunsellCode(input).replace(/(?:\s*(\([^)]*\)|\[[^\]]*\]))+\s*$/, '');
   const desc = munsellDescriptionFor(code);
   return desc ? `${code}\n[${desc}]` : code;
 }
@@ -2002,9 +2002,9 @@ async function exportRecordPdf(s, base) {
     const desc = restrictive === 'Yes' ? (note || 'Restrictive layer') : r[4];
     return [r[0], range, r[3], desc, r[5], r[6], r[7], r[8], r[9], r[10]];
   });
-  drawTable('Hydric Soils', ['Horizon','Depth Range (cm)','Thickness (cm)','Texture / Restrictive Note','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilsPdfRows,
-    [contentW*0.07,contentW*0.16,contentW*0.09,contentW*0.13,contentW*0.14,contentW*0.06,contentW*0.14,contentW*0.06,contentW*0.08,contentW*0.07],
-    { wrapCells: true, fontSize: 7.2 });
+  drawTable('Hydric Soils', ['Horizon','Depth Range (cm)','Thickness (cm)','Texture / Note','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilsPdfRows,
+    [contentW*0.07,contentW*0.16,contentW*0.09,contentW*0.15,contentW*0.13,contentW*0.06,contentW*0.13,contentW*0.06,contentW*0.08,contentW*0.07],
+    { wrapCells: true, fontSize: 6.8 });
 
   const hydroRows = [
     ['Restrictive Layer', s.RestrictiveLayer || '—'],
@@ -2278,9 +2278,9 @@ async function exportRecordPdfFormStyle(s, base) {
     const desc = restrictive === 'Yes' ? (note || 'Restrictive layer') : r[4];
     return [r[0], range, r[3], desc, r[5], r[6], r[7], r[8], r[9], r[10]];
   });
-  drawTable(['Horizon', 'Depth Range (cm)', 'Thickness (cm)', 'Texture / Restrictive Note', 'Matrix Color', 'Matrix %', 'Redox Color', 'Redox %', 'Redox Type', 'Redox Location'], soilsFormRows,
-    [contentW*0.07,contentW*0.16,contentW*0.09,contentW*0.13,contentW*0.14,contentW*0.06,contentW*0.14,contentW*0.06,contentW*0.08,contentW*0.07],
-    { wrapCells: true, fontSize: 7.2 });
+  drawTable(['Horizon', 'Depth Range (cm)', 'Thickness (cm)', 'Texture / Note', 'Matrix Color', 'Matrix %', 'Redox Color', 'Redox %', 'Redox Type', 'Redox Location'], soilsFormRows,
+    [contentW*0.07,contentW*0.16,contentW*0.09,contentW*0.15,contentW*0.13,contentW*0.06,contentW*0.13,contentW*0.06,contentW*0.08,contentW*0.07],
+    { wrapCells: true, fontSize: 6.8 });
   drawKV([
     ['Hydric Soil Indicators', (s.HydricSoilIndicators || []).join(', ') || '—'],
     ['Restrictive Layer', s.RestrictiveLayer || '—'],
