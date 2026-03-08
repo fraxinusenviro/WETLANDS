@@ -68,7 +68,7 @@ WETLANDS provides a practical, offline-friendly form workflow for:
 
 ### Vegetation indices
 
-- Dominance Test computed from dominant species entries (with auto-dominance fallback by stratum cover)
+- Dominance Test computed automatically using the 50/20 rule by stratum (Tree/Shrub/Herb)
 - Prevalence Index computed from indicator-status weighted cover totals (OBL/FACW/FAC/FACU/UPL)
 
 ### Reporting style

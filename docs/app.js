@@ -196,6 +196,10 @@ function renderVegetation() {
           state[`${g}Sp${i}Cov`] = cov.value;
           recomputeDominanceFlags();
           queueAutosave();
+        };
+        cov.onchange = () => {
+          recomputeDominanceFlags();
+          queueAutosave();
           renderVegetation();
         };
 
@@ -875,20 +879,24 @@ function soilRows(s) {
   return rows.length ? rows : [['H1', '—', '—', '—', '—', '—', '—', '—', '—']];
 }
 
-function vegetationEntries() {
+function vegetationEntriesFromSurvey(s) {
   const entries = [];
   const groups = [['Tree', 6], ['Shrub', 6], ['Herb', 10]];
   groups.forEach(([g, n]) => {
     for (let i = 1; i <= n; i++) {
-      const sp = state[`${g}Sp${i}`];
-      const cov = Number(state[`${g}Sp${i}Cov`] || 0);
-      const status = normalizeStatus(state[`${g}Sp${i}Status`] || '');
-      const manualDom = !!state[`${g}Sp${i}Dom`];
+      const sp = s[`${g}Sp${i}`];
+      const cov = Number(s[`${g}Sp${i}Cov`] || 0);
+      const status = normalizeStatus(s[`${g}Sp${i}Status`] || '');
+      const manualDom = !!s[`${g}Sp${i}Dom`];
       if (!sp && !cov) continue;
       entries.push({ group: g, i, species: sp || '—', cover: Number.isFinite(cov) ? cov : 0, status, manualDom });
     }
   });
   return entries;
+}
+
+function vegetationEntries() {
+  return vegetationEntriesFromSurvey(state);
 }
 
 function autoDominantSet(entries) {
@@ -931,8 +939,8 @@ function recomputeDominanceFlags() {
   });
 }
 
-function vegetationMetrics() {
-  const entries = vegetationEntries();
+function vegetationMetricsFromSurvey(s) {
+  const entries = vegetationEntriesFromSurvey(s);
   const autoSet = autoDominantSet(entries);
   const dominant = entries.filter(e => autoSet.has(`${e.group}:${e.i}`));
 
@@ -957,6 +965,10 @@ function vegetationMetrics() {
     cover,
     dominant
   };
+}
+
+function vegetationMetrics() {
+  return vegetationMetricsFromSurvey(state);
 }
 
 function markdownTable(headers, rows) {
@@ -1437,12 +1449,24 @@ async function exportRecordPdf(s, base) {
     .map(k => [displayLabel(k), s[k] || '—']);
   drawTable('Disturbance & Problematic Conditions', ['Condition', 'Value'], disturbanceRows, [contentW * 0.66, contentW * 0.34], { showHeader: false, boldLeftColumn: true });
 
-  const vegRows = [
-    ...speciesRows(s, 'Tree', 6).map(r => ['Tree', r[0], r[1]]),
-    ...speciesRows(s, 'Shrub', 6).map(r => ['Shrub', r[0], r[1]]),
-    ...speciesRows(s, 'Herb', 10).map(r => ['Herb', r[0], r[1]])
-  ];
-  drawTable('Vegetation', ['Layer', 'Species', '% Cover'], vegRows, [contentW * 0.14, contentW * 0.62, contentW * 0.24]);
+  const vegEntries = vegetationEntriesFromSurvey(s);
+  const vegAuto = autoDominantSet(vegEntries);
+  const vegRows = vegEntries.map(e => [
+    e.group,
+    e.species || '—',
+    e.status || '—',
+    e.cover || '—',
+    vegAuto.has(`${e.group}:${e.i}`) ? 'Y' : 'N'
+  ]);
+  drawTable('Vegetation', ['Layer', 'Species', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—']], [contentW * 0.12, contentW * 0.48, contentW * 0.14, contentW * 0.16, contentW * 0.10]);
+
+  const vMetrics = vegetationMetricsFromSurvey(s);
+  drawTable('Vegetation Indices', ['Metric', 'Value'], [
+    ['Dominance Test (A/B)', `${vMetrics.dominanceA}/${vMetrics.dominanceB} (${vMetrics.dominancePct.toFixed(1)}%)`],
+    ['Dominance Pass (>50%)', vMetrics.dominancePass ? 'Yes' : 'No'],
+    ['Prevalence Index (B/A)', vMetrics.prevalenceIndex.toFixed(2)],
+    ['Prevalence Pass (≤3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
+  ], [contentW * 0.45, contentW * 0.55], { showHeader: false, boldLeftColumn: true });
 
   const soilsRows = soilRows(s);
   drawTable('Hydric Soils', ['Hor','Thk','Texture','Matrix','M%','Redox','R%','Type','Loc'], soilsRows,
@@ -1667,13 +1691,19 @@ async function exportRecordPdfFormStyle(s, base) {
     ['Is the sampled area within a wetland?', s.SummaryInWetlandYN || '—']
   ], 0.62);
 
-  const vegRows = [
-    ...speciesRows(s, 'Tree', 6).map(r => ['Tree', r[0], r[1]]),
-    ...speciesRows(s, 'Shrub', 6).map(r => ['Shrub', r[0], r[1]]),
-    ...speciesRows(s, 'Herb', 10).map(r => ['Herb', r[0], r[1]])
-  ];
+  const vegEntries = vegetationEntriesFromSurvey(s);
+  const vegAuto = autoDominantSet(vegEntries);
+  const vegRows = vegEntries.map(e => [e.group, e.species || '—', e.status || '—', e.cover || '—', vegAuto.has(`${e.group}:${e.i}`) ? 'Y' : 'N']);
   sectionBar('Vegetation');
-  drawTable(['Stratum', 'Species', '% Cover'], vegRows, [contentW * 0.16, contentW * 0.62, contentW * 0.22]);
+  drawTable(['Stratum', 'Species', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—'],], [contentW * 0.14, contentW * 0.46, contentW * 0.14, contentW * 0.16, contentW * 0.10]);
+
+  const vMetrics = vegetationMetricsFromSurvey(s);
+  drawKV([
+    ['Dominance Test (A/B)', `${vMetrics.dominanceA}/${vMetrics.dominanceB} (${vMetrics.dominancePct.toFixed(1)}%)`],
+    ['Dominance Pass (>50%)', vMetrics.dominancePass ? 'Yes' : 'No'],
+    ['Prevalence Index (B/A)', vMetrics.prevalenceIndex.toFixed(2)],
+    ['Prevalence Pass (≤3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
+  ], 0.45);
 
   sectionBar('Soils');
   drawTable(['Hor', 'Thk (cm)', 'Texture', 'Matrix', 'M%', 'Redox', 'R%', 'Type', 'Loc'], soilRows(s),
