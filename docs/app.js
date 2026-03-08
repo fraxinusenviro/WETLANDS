@@ -77,7 +77,7 @@ function defaultSurvey() {
   const obj = { id: makeId(), timestamp: new Date().toISOString(), SiteID:"", LocaleName:"", Province:"", date: now.toISOString().slice(0,10), time: now.toTimeString().slice(0,5), observer:"", PLOT_ID:"", WetlandID:"", PLOT_TYPE:"", latitude:"", longitude:"", LocalRelief:"", PercentSlope:"", Landform:"", DistSoilYN:"", DistVegYN:"", DistHydroYN:"", ProbSoilYN:"", ProbVegYN:"", ProbHydroYN:"", ClimHydroNormalYN:"", CircNormalYN:"", SummaryHydroVegYN:"", SummaryHydricSoilYN:"", SummaryHydrologyYN:"", SummaryInWetlandYN:"", notes:"", RestrictiveLayer:"", RestrictiveLayerDepthCM:"", SurfaceWaterYN:"", SurfaceWaterDepthCM:"", WaterTableYN:"", WaterTableDepthCM:"", SaturationYN:"", SaturationDepthCM:"", HydricSoilIndicators:[], HydrologyPrimary:[], HydrologySecondary:[], photos:[] };
   ["Tree","Shrub"].forEach(g => { for (let i=1;i<=6;i++) { obj[`${g}Sp${i}`]=""; obj[`${g}Sp${i}Cov`]=""; obj[`${g}Sp${i}Status`]=""; obj[`${g}Sp${i}Dom`]=false; } });
   for (let i=1;i<=10;i++) { obj[`HerbSp${i}`]=""; obj[`HerbSp${i}Cov`]=""; obj[`HerbSp${i}Status`]=""; obj[`HerbSp${i}Dom`]=false; }
-  for (let h=1;h<=4;h++) ["ThickCM","Texture","Matrix","MatrixPC","Redox","RedoxPC","RedoxType","RedoxLoc"].forEach(s => obj[`SoilH${h}${s}`]="");
+  for (let h=1;h<=4;h++) ["StartDepthCM","EndDepthCM","ThickCM","Texture","Matrix","MatrixPC","Redox","RedoxPC","RedoxType","RedoxLoc"].forEach(s => obj[`SoilH${h}${s}`]="");
   return obj;
 }
 
@@ -148,6 +148,10 @@ function renderMetadata() {
       locWrap.className = 'field';
       locWrap.innerHTML = `<label>GPS Capture</label><button type='button' id='btn-location'>Use Device Location</button>`;
       root.appendChild(locWrap);
+      locWrap.querySelector('#btn-location')?.addEventListener('click', () => navigator.geolocation.getCurrentPosition(
+        pos => { state.latitude = pos.coords.latitude; state.longitude = pos.coords.longitude; queueAutosave(true); renderFormPages(); },
+        () => alert('Could not read location.')
+      ));
     }
   });
   root.appendChild(fieldEl('notes','textarea'));
@@ -315,6 +319,7 @@ function renderSoils() {
       const table = document.createElement('div');
       table.className = 'soil-table';
       const pairs = [
+        ['Start Depth (cm)', `SoilH${h}StartDepthCM`, 'number', 'End Depth (cm)', `SoilH${h}EndDepthCM`, 'number'],
         ['Thickness (cm)', `SoilH${h}ThickCM`, 'number', 'Texture', `SoilH${h}Texture`, 'text'],
         ['Matrix', `SoilH${h}Matrix`, 'text', 'Matrix %', `SoilH${h}MatrixPC`, 'number'],
         ['Redox', `SoilH${h}Redox`, 'text', 'Redox %', `SoilH${h}RedoxPC`, 'number'],
@@ -452,10 +457,6 @@ function bindActions() {
   document.getElementById('btn-prev-tab').onclick = () => setActiveTab(activeTabIndex - 1);
   document.getElementById('btn-next-tab').onclick = () => setActiveTab(activeTabIndex + 1);
 
-  document.getElementById('btn-location').onclick = () => navigator.geolocation.getCurrentPosition(
-    pos => { state.latitude = pos.coords.latitude; state.longitude = pos.coords.longitude; queueAutosave(true); renderFormPages(); },
-    () => alert('Could not read location.')
-  );
 
   document.addEventListener('change', async (e) => {
     if (e.target?.id === 'photo-input') {
@@ -888,9 +889,9 @@ function displayLabel(key) {
     const suffix = m[3] === 'Cov' ? ' % Cover' : m[3] === 'Status' ? ' Indicator Status' : m[3] === 'Dom' ? ' Dominant?' : '';
     return `${m[1]} Species #${m[2]}${suffix}`;
   }
-  const h = key.match(/^SoilH(\d+)(ThickCM|Texture|Matrix|MatrixPC|Redox|RedoxPC|RedoxType|RedoxLoc)$/);
+  const h = key.match(/^SoilH(\d+)(StartDepthCM|EndDepthCM|ThickCM|Texture|Matrix|MatrixPC|Redox|RedoxPC|RedoxType|RedoxLoc)$/);
   if (h) {
-    const map = { ThickCM: 'Thickness (cm)', Texture: 'Texture', Matrix: 'Matrix Color', MatrixPC: 'Matrix %', Redox: 'Redox Color', RedoxPC: 'Redox %', RedoxType: 'Redox Type', RedoxLoc: 'Redox Location' };
+    const map = { StartDepthCM: 'Start Depth (cm)', EndDepthCM: 'End Depth (cm)', ThickCM: 'Thickness (cm)', Texture: 'Texture', Matrix: 'Matrix Color', MatrixPC: 'Matrix %', Redox: 'Redox Color', RedoxPC: 'Redox %', RedoxType: 'Redox Type', RedoxLoc: 'Redox Location' };
     return `Soil Horizon ${h[1]} ${map[h[2]]}`;
   }
   const fixed = {
@@ -1089,6 +1090,8 @@ function munsellDisplayMultiline(input) {
 function soilRows(s, includeMunsellDescriptions = false, multilineMunsellDescription = false) {
   const rows = [];
   for (let h = 1; h <= 4; h++) {
+    const startDepth = s[`SoilH${h}StartDepthCM`];
+    const endDepth = s[`SoilH${h}EndDepthCM`];
     const thick = s[`SoilH${h}ThickCM`];
     const texture = s[`SoilH${h}Texture`];
     const matrixRaw = s[`SoilH${h}Matrix`];
@@ -1103,11 +1106,11 @@ function soilRows(s, includeMunsellDescriptions = false, multilineMunsellDescrip
     const redoxPC = s[`SoilH${h}RedoxPC`];
     const redoxType = s[`SoilH${h}RedoxType`];
     const redoxLoc = s[`SoilH${h}RedoxLoc`];
-    if ([thick, texture, matrixRaw, matrixPC, redoxRaw, redoxPC, redoxType, redoxLoc].some(Boolean)) {
-      rows.push([`H${h}`, thick || '—', texture || '—', matrix || '—', matrixPC || '—', redox || '—', redoxPC || '—', redoxType || '—', redoxLoc || '—']);
+    if ([startDepth, endDepth, thick, texture, matrixRaw, matrixPC, redoxRaw, redoxPC, redoxType, redoxLoc].some(Boolean)) {
+      rows.push([`H${h}`, startDepth || '—', endDepth || '—', thick || '—', texture || '—', matrix || '—', matrixPC || '—', redox || '—', redoxPC || '—', redoxType || '—', redoxLoc || '—']);
     }
   }
-  return rows.length ? rows : [['H1', '—', '—', '—', '—', '—', '—', '—', '—']];
+  return rows.length ? rows : [['H1', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—']];
 }
 
 function vegetationEntriesFromSurvey(s) {
@@ -1234,7 +1237,7 @@ function recordMarkdown(s) {
   lines.push('', '### B. Shrub Species', markdownTable(['Species', '% Cover'], speciesRows(s, 'Shrub', 6)));
   lines.push('', '### C. Herb Species', markdownTable(['Species', '% Cover'], speciesRows(s, 'Herb', 10)));
 
-  lines.push('', '## 5. Hydric Soils', markdownTable(['Horizon','Thickness (cm)','Texture','Matrix','Matrix %','Redox','Redox %','Type','Location'], soilRows(s)));
+  lines.push('', '## 5. Hydric Soils', markdownTable(['Horizon','Start Depth (cm)','End Depth (cm)','Thickness (cm)','Texture','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilRows(s)));
   lines.push('', `**Hydric Soil Indicators:** ${(s.HydricSoilIndicators||[]).join(', ') || '—'}`);
 
   lines.push('', '## 6. Wetland Hydrology');
@@ -1376,7 +1379,7 @@ function recordHTML(s) {
     <div class='section'>
       <h2>Hydric Soils</h2>
       <table>
-        <thead><tr><th>Horizon</th><th>Thickness (cm)</th><th>Texture</th><th>Matrix</th><th>Matrix %</th><th>Redox</th><th>Redox %</th><th>Type</th><th>Location</th></tr></thead>
+        <thead><tr><th>Horizon</th><th>Start Depth (cm)</th><th>End Depth (cm)</th><th>Thickness (cm)</th><th>Texture</th><th>Matrix Color</th><th>Matrix %</th><th>Redox Color</th><th>Redox %</th><th>Redox Type</th><th>Redox Location</th></tr></thead>
         <tbody>${soils.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody>
       </table>
       <p class='chipline'><strong>Hydric Soil Indicators:</strong> ${(s.HydricSoilIndicators||[]).join(', ') || '—'}</p>
@@ -1768,9 +1771,9 @@ async function exportRecordPdf(s, base) {
   drawHeader();
 
   const soilsRows = soilRows(s, true, true);
-  drawTable('Hydric Soils', ['Horizon','Thickness (cm)','Texture','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilsRows,
-    [contentW*0.06,contentW*0.10,contentW*0.10,contentW*0.18,contentW*0.06,contentW*0.18,contentW*0.07,contentW*0.12,contentW*0.13],
-    { wrapCells: true });
+  drawTable('Hydric Soils', ['Horizon','Start Depth (cm)','End Depth (cm)','Thickness (cm)','Texture','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilsRows,
+    [contentW*0.05,contentW*0.08,contentW*0.08,contentW*0.08,contentW*0.09,contentW*0.16,contentW*0.06,contentW*0.16,contentW*0.06,contentW*0.09,contentW*0.09],
+    { wrapCells: true, fontSize: 7.2 });
 
   const hydroRows = [
     ['Restrictive Layer', s.RestrictiveLayer || '—'],
@@ -1905,6 +1908,7 @@ async function exportRecordPdfFormStyle(s, base) {
   };
 
   const drawTable = (headers, rows, widths, opts = {}) => {
+    const fontSize = opts.fontSize ?? 8;
     const baseRowH = 12;
     const headerH = 14;
 
@@ -1916,7 +1920,7 @@ async function exportRecordPdfFormStyle(s, base) {
 
     let cx = margin;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(fontSize);
     doc.setTextColor(15, 23, 42);
     headers.forEach((h, i) => {
       doc.text(String(h), cx + 3, y + 9);
@@ -1931,7 +1935,7 @@ async function exportRecordPdfFormStyle(s, base) {
         const lines = opts.wrapCells ? splitByLine : [splitByLine[0] || '—'];
         return lines.length ? lines : ['—'];
       });
-      const rowH = Math.max(baseRowH, ...wrapped.map(lines => (lines.length * 9) + 4));
+      const rowH = Math.max(baseRowH, ...wrapped.map(lines => (lines.length * (fontSize + 1)) + 4));
       ensureSpace(rowH + 4);
 
       doc.rect(margin, y, contentW, rowH);
@@ -1939,7 +1943,7 @@ async function exportRecordPdfFormStyle(s, base) {
       wrapped.forEach((lines, i) => {
         const italic = Array.isArray(opts.italicCols) && opts.italicCols.includes(i);
         doc.setFont('helvetica', i === 0 ? 'bold' : (italic ? 'italic' : 'normal'));
-        lines.forEach((ln, li) => doc.text(String(ln || '—'), rx + 3, y + 8.5 + (li * 9)));
+        lines.forEach((ln, li) => doc.text(String(ln || '—'), rx + 3, y + 8.5 + (li * (fontSize + 1))));
         rx += widths[i];
       });
       let vx = margin;
@@ -2035,9 +2039,9 @@ async function exportRecordPdfFormStyle(s, base) {
   y += fp2Lines.length * 7 + 5;
 
   sectionBar('Soils');
-  drawTable(['Horizon', 'Thickness (cm)', 'Texture', 'Matrix Color', 'Matrix %', 'Redox Color', 'Redox %', 'Redox Type', 'Redox Location'], soilRows(s, true, true),
-    [contentW*0.06,contentW*0.10,contentW*0.10,contentW*0.18,contentW*0.06,contentW*0.18,contentW*0.07,contentW*0.12,contentW*0.13],
-    { wrapCells: true });
+  drawTable(['Horizon', 'Start Depth (cm)', 'End Depth (cm)', 'Thickness (cm)', 'Texture', 'Matrix Color', 'Matrix %', 'Redox Color', 'Redox %', 'Redox Type', 'Redox Location'], soilRows(s, true, true),
+    [contentW*0.05,contentW*0.08,contentW*0.08,contentW*0.08,contentW*0.09,contentW*0.16,contentW*0.06,contentW*0.16,contentW*0.06,contentW*0.09,contentW*0.09],
+    { wrapCells: true, fontSize: 7.2 });
   drawKV([
     ['Hydric Soil Indicators', (s.HydricSoilIndicators || []).join(', ') || '—'],
     ['Restrictive Layer', s.RestrictiveLayer || '—'],
