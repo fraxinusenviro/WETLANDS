@@ -1,4 +1,4 @@
-const CACHE = "wetlands-1-1-v13";
+const CACHE = "wetlands-1-1-v14";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,6 +6,9 @@ const ASSETS = [
   "./app.js",
   "./manifest.webmanifest",
   "./VASC_names.json",
+  "./species_ns_indicators.json",
+  "./species_ns_full_records.json",
+  "./species_ns_data_dictionary.json",
   "./icon-192.png",
   "./icon-512.png",
   "./assets/fraxinus-logo.svg"

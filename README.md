@@ -39,6 +39,13 @@ WETLANDS provides a practical, offline-friendly form workflow for:
 - Notes field
 - Photo attachment support with preview/removal before submit
 
+### Plant reference lookup
+
+- Dedicated in-app species reference view on the dashboard
+- Search by common name, scientific name, and available species codes
+- Detailed species card output from NS indicator source records
+- Data-dictionary definitions shown inline for coded/technical fields
+
 ### Local persistence
 
 - Draft autosave + restore via **IndexedDB** (`wetlandCurrentDraft`)

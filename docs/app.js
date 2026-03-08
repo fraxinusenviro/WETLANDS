@@ -24,6 +24,8 @@ const SURVEYS_KEY = 'wetlandSurveys';
 let speciesList = ["ACERrubr", "PICErube", "QUERrubr", "KALMangu", "VIBUcass", "PTERaqui"];
 let speciesRecords = [];
 let speciesDisplayMap = new Map();
+let plantReferenceRecords = [];
+let speciesDataDictionary = {};
 let state = defaultSurvey();
 let surveys = [];
 let activeTabIndex = 0;
@@ -346,7 +348,12 @@ function bindActions() {
   document.getElementById('btn-home').onclick = async () => { await refreshDashboard(); showView('home'); };
   document.getElementById('btn-launch-new').onclick = () => { state = defaultSurvey(); renderFormPages(); queueAutosave(true); showView('form'); };
   document.getElementById('btn-open-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); showView('submissions'); };
+  document.getElementById('btn-open-plant-ref').onclick = () => { renderPlantReferenceList(''); showView('plant-ref'); };
   document.getElementById('btn-refresh-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); };
+  const plantSearch = document.getElementById('plant-ref-search');
+  if (plantSearch) {
+    plantSearch.oninput = () => renderPlantReferenceList(plantSearch.value || '');
+  }
 
   document.getElementById('btn-prev-tab').onclick = () => setActiveTab(activeTabIndex - 1);
   document.getElementById('btn-next-tab').onclick = () => setActiveTab(activeTabIndex + 1);
@@ -510,14 +517,58 @@ function speciesSearchKey(rec) {
   return [rec.mcode, rec.elcode, rec.commonName, rec.scientificName].filter(Boolean).join(' ').toLowerCase();
 }
 
+function searchPlantReference(q) {
+  const query = String(q || '').trim().toLowerCase();
+  if (!query) return plantReferenceRecords.slice(0, 100);
+  return plantReferenceRecords.filter(r => {
+    const fields = [
+      r['AC CDC Name'], r['GS Name'], r['AC CDC English Name'], r['GS English Name'],
+      r['ELCODE'], r['NS Wetland Indicator Rank']
+    ].filter(Boolean).join(' ').toLowerCase();
+    return fields.includes(query);
+  }).slice(0, 150);
+}
+
+function renderPlantReferenceList(query = '') {
+  const list = document.getElementById('plant-ref-results');
+  const detail = document.getElementById('plant-ref-detail');
+  if (!list || !detail) return;
+  const rows = searchPlantReference(query);
+  if (!rows.length) {
+    list.innerHTML = `<div class='card muted'>No matching species.</div>`;
+    detail.innerHTML = `<p class='muted'>No record selected.</p>`;
+    return;
+  }
+  list.innerHTML = '';
+  rows.forEach((r, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'launch-card';
+    const sci = r['AC CDC Name'] || r['GS Name'] || 'Unknown';
+    const common = r['AC CDC English Name'] || r['GS English Name'] || 'Unknown';
+    const code = r['ELCODE'] || '—';
+    const status = String(r['NS Wetland Indicator Rank'] || '').toUpperCase() || '—';
+    btn.innerHTML = `<strong>${common}</strong><span><em>${sci}</em> · ${code} · ${status}</span>`;
+    btn.onclick = () => {
+      const entries = Object.entries(r).filter(([,v]) => String(v || '').trim() !== '');
+      detail.innerHTML = `<h3>${common}</h3><p class='muted'><em>${sci}</em></p><div>${entries.map(([k,v]) => `<p><strong>${k}:</strong> ${v}${speciesDataDictionary[k] ? `<br><span class='muted'>${speciesDataDictionary[k]}</span>` : ''}</p>`).join('')}</div>`;
+    };
+    list.appendChild(btn);
+    if (idx === 0 && !query) btn.click();
+  });
+}
+
 async function loadSpecies() {
   try {
-    const [legacyRes, nsRes] = await Promise.all([
+    const [legacyRes, nsRes, fullRes, dictRes] = await Promise.all([
       fetch('./VASC_names.json'),
-      fetch('./species_ns_indicators.json')
+      fetch('./species_ns_indicators.json'),
+      fetch('./species_ns_full_records.json'),
+      fetch('./species_ns_data_dictionary.json')
     ]);
     const legacyRaw = legacyRes.ok ? await legacyRes.json() : [];
     const nsRaw = nsRes.ok ? await nsRes.json() : [];
+    plantReferenceRecords = fullRes.ok ? await fullRes.json() : [];
+    speciesDataDictionary = dictRes.ok ? await dictRes.json() : {};
 
     const legacy = (Array.isArray(legacyRaw) ? legacyRaw : [])
       .map(parseLegacySpeciesLine)
