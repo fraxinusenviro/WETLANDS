@@ -231,7 +231,9 @@ button.primary {
 .soil-cell input, .soil-cell select { width:100%; padding:.5rem .55rem; border-radius:.45rem; border:1px solid #324869; background:#0f1827; color:var(--text); }
 
 .instructions-popover {
-  width: min(640px, 92vw);
+  width: min(760px, 94vw);
+  max-height: 82vh;
+  overflow: auto;
   border: 1px solid var(--line);
   border-radius: .9rem;
   background: linear-gradient(160deg, #111d30, #0d1726);

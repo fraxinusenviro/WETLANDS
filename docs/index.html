@@ -101,6 +101,9 @@
 
       <section class="page" data-page="soils">
         <h2>Soils</h2>
+        <div class="actions" style="margin-top:.2rem">
+          <button type="button" id="btn-hydric-guide" class="icon-left"><i data-lucide="book-marked"></i><span>Hydric Soil Reference Guide</span></button>
+        </div>
         <div id="soil-fields"></div>
         <div class="actions">
           <button type="button" class="primary" id="btn-submit">Submit Survey</button>
@@ -150,6 +153,21 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=20"></script>
+  <dialog id="hydric-guide-popover" class="instructions-popover">
+    <h3>Northeastern / NS Hydric Soil Reference</h3>
+    <p class="muted">Quick guide adapted from the 2012 Nova Scotia reference. Use for field screening and documentation support.</p>
+    <ul>
+      <li><strong>All soils (A):</strong> A1 Histosol, A2 Histic Epipedon, A4 Hydrogen Sulfide, A5 Stratified Layers, A11 Depleted Below Dark Surface, A12 Thick Dark Surface.</li>
+      <li><strong>Sandy soils (S):</strong> S1 Sandy Mucky Mineral, S4 Sandy Gleyed Matrix, S5 Sandy Redox, S6 Stripped Matrix, S7 Dark Surface, S8 Polyvalue Below Surface, S9 Thin Dark Surface.</li>
+      <li><strong>Loamy/clayey soils (F):</strong> F2 Loamy Gleyed Matrix, F3 Depleted Matrix, F6 Redox Dark Surface, F7 Depleted Dark Surface, F8 Redox Depressions.</li>
+      <li><strong>Problem-soil indicators (conditional):</strong> F21 Red Parent Material, TF12 Very Shallow Dark Surface, S3 5 cm Mucky Peat or Peat, F12 Iron/Manganese Masses.</li>
+    </ul>
+    <p class="muted">Core thresholds repeatedly used: <strong>starts within 15/25/30 cm</strong>, required <strong>minimum thickness</strong>, matrix/depletion <strong>chroma ≤2</strong> rules, and redox concentration percentages. Confirm hydrophytic vegetation and wetland hydrology when required.</p>
+    <div class="actions">
+      <button id="btn-close-hydric-guide" class="primary" type="button">Close guide</button>
+    </div>
+  </dialog>
+
+  <script src="app.js?v=21"></script>
 </body>
 </html>

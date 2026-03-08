@@ -432,6 +432,12 @@ function bindActions() {
   document.getElementById('btn-close-instructions')?.addEventListener('click', () => {
     document.getElementById('instructions-popover')?.close();
   });
+  document.getElementById('btn-hydric-guide')?.addEventListener('click', () => {
+    document.getElementById('hydric-guide-popover')?.showModal();
+  });
+  document.getElementById('btn-close-hydric-guide')?.addEventListener('click', () => {
+    document.getElementById('hydric-guide-popover')?.close();
+  });
   document.getElementById('btn-launch-new').onclick = () => { state = defaultSurvey(); renderFormPages(); queueAutosave(true); showView('form'); };
   document.getElementById('btn-open-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); showView('submissions'); };
   document.getElementById('btn-open-drafts').onclick = async () => { draftsLibrary = await loadDraftLibrary(); renderDraftsLibrary(); showView('drafts'); };
