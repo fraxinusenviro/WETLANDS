@@ -22,6 +22,8 @@ const DRAFT_KEY = 'wetlandCurrentDraft';
 const SURVEYS_KEY = 'wetlandSurveys';
 
 let speciesList = ["ACERrubr", "PICErube", "QUERrubr", "KALMangu", "VIBUcass", "PTERaqui"];
+let speciesRecords = [];
+let speciesDisplayMap = new Map();
 let state = defaultSurvey();
 let surveys = [];
 let activeTabIndex = 0;
@@ -60,8 +62,8 @@ async function init() {
 function defaultSurvey() {
   const now = new Date();
   const obj = { id: makeId(), timestamp: new Date().toISOString(), SiteID:"", LocaleName:"", Province:"", date: now.toISOString().slice(0,10), time: now.toTimeString().slice(0,5), observer:"", PLOT_ID:"", PLOT_TYPE:"", latitude:"", longitude:"", DistSoilYN:"", DistVegYN:"", DistHydroYN:"", ProbSoilYN:"", ProbVegYN:"", ProbHydroYN:"", ClimHydroNormalYN:"", CircNormalYN:"", SummaryHydroVegYN:"", SummaryHydricSoilYN:"", SummaryHydrologyYN:"", SummaryInWetlandYN:"", notes:"", RestrictiveLayer:"", RestrictiveLayerDepthCM:"", SurfaceWaterYN:"", SurfaceWaterDepthCM:"", WaterTableYN:"", WaterTableDepthCM:"", SaturationYN:"", SaturationDepthCM:"", HydricSoilIndicators:[], HydrologyPrimary:[], HydrologySecondary:[], photos:[] };
-  ["Tree","Shrub"].forEach(g => { for (let i=1;i<=6;i++) { obj[`${g}Sp${i}`]=""; obj[`${g}Sp${i}Cov`]=""; } });
-  for (let i=1;i<=10;i++) { obj[`HerbSp${i}`]=""; obj[`HerbSp${i}Cov`]=""; }
+  ["Tree","Shrub"].forEach(g => { for (let i=1;i<=6;i++) { obj[`${g}Sp${i}`]=""; obj[`${g}Sp${i}Cov`]=""; obj[`${g}Sp${i}Status`]=""; obj[`${g}Sp${i}Dom`]=false; } });
+  for (let i=1;i<=10;i++) { obj[`HerbSp${i}`]=""; obj[`HerbSp${i}Cov`]=""; obj[`HerbSp${i}Status`]=""; obj[`HerbSp${i}Dom`]=false; }
   for (let h=1;h<=4;h++) ["ThickCM","Texture","Matrix","MatrixPC","Redox","RedoxPC","RedoxType","RedoxLoc"].forEach(s => obj[`SoilH${h}${s}`]="");
   return obj;
 }
@@ -156,7 +158,7 @@ function renderVegetation() {
     if (!vegUi[g].collapsed) {
       const table = document.createElement('div');
       table.className = 'veg-table';
-      table.innerHTML = `<div class='veg-row veg-header'><div>#</div><div>Species</div><div>%</div></div>`;
+      table.innerHTML = `<div class='veg-row veg-header'><div>#</div><div>Species (Common / Scientific / MCode)</div><div>Status</div><div>%</div><div>Dom</div></div>`;
 
       for (let i = 1; i <= Math.min(vegUi[g].count, n); i++) {
         const row = document.createElement('div');
@@ -167,22 +169,56 @@ function renderVegetation() {
         species.type = 'text';
         species.setAttribute('list', 'species-options');
         species.value = state[`${g}Sp${i}`] ?? '';
-        species.oninput = () => { state[`${g}Sp${i}`] = species.value; queueAutosave(); };
+        species.oninput = () => {
+          state[`${g}Sp${i}`] = species.value;
+          applySpeciesLookup(g, i, species.value);
+          queueAutosave();
+          renderVegetation();
+        };
+        species.onchange = species.oninput;
+
+        const status = document.createElement('input');
+        status.type = 'text';
+        status.value = state[`${g}Sp${i}Status`] ?? '';
+        status.placeholder = 'Status';
+        status.readOnly = true;
 
         const cov = document.createElement('input');
         cov.type = 'number';
         cov.step = 'any';
         cov.value = state[`${g}Sp${i}Cov`] ?? '';
-        cov.oninput = () => { state[`${g}Sp${i}Cov`] = cov.value; queueAutosave(); };
+        cov.oninput = () => { state[`${g}Sp${i}Cov`] = cov.value; queueAutosave(); renderVegetation(); };
+
+        const dom = document.createElement('input');
+        dom.type = 'checkbox';
+        dom.checked = !!state[`${g}Sp${i}Dom`];
+        dom.onchange = () => { state[`${g}Sp${i}Dom`] = dom.checked; queueAutosave(); renderVegetation(); };
 
         row.appendChild(species);
+        row.appendChild(status);
         row.appendChild(cov);
+        row.appendChild(dom);
         table.appendChild(row);
       }
       card.appendChild(table);
     }
     root.appendChild(card);
   });
+
+  const metrics = vegetationMetrics();
+  const summary = document.createElement('div');
+  summary.className = 'card';
+  summary.innerHTML = `
+    <h3 class='group-title'>Vegetation Indices</h3>
+    <div class='grid two'>
+      <div><strong>Dominance Test (A/B):</strong> ${metrics.dominanceA}/${metrics.dominanceB} = <strong>${metrics.dominancePct.toFixed(1)}%</strong></div>
+      <div><strong>Dominance Test Pass (&gt;50%):</strong> ${metrics.dominancePass ? 'Yes' : 'No'}</div>
+      <div><strong>Prevalence Index (B/A):</strong> <strong>${metrics.prevalenceIndex.toFixed(2)}</strong></div>
+      <div><strong>Prevalence Test Pass (≤3.0):</strong> ${metrics.prevalencePass ? 'Yes' : 'No'}</div>
+    </div>
+    <p class='muted'>Coverage totals — OBL: ${metrics.cover.OBL.toFixed(2)}, FACW: ${metrics.cover.FACW.toFixed(2)}, FAC: ${metrics.cover.FAC.toFixed(2)}, FACU: ${metrics.cover.FACU.toFixed(2)}, UPL: ${metrics.cover.UPL.toFixed(2)}</p>
+  `;
+  root.appendChild(summary);
 
   root.querySelectorAll('button[data-collapse]').forEach(b => b.onclick = () => {
     const g = b.dataset.collapse; vegUi[g].collapsed = !vegUi[g].collapsed; renderVegetation();
@@ -441,19 +477,122 @@ async function refreshDashboard() {
   ].join('');
 }
 
+function normalizeStatus(status) {
+  const s = String(status || '').toUpperCase().replace(/\s+/g, '');
+  if (s.startsWith('OBL')) return 'OBL';
+  if (s.startsWith('FACW')) return 'FACW';
+  if (s === 'FAC' || s.startsWith('FAC+')) return 'FAC';
+  if (s.startsWith('FACU')) return 'FACU';
+  if (s.startsWith('UPL')) return 'UPL';
+  return '';
+}
+
+function parseLegacySpeciesLine(line) {
+  const m = String(line || '').match(/^([^\s-]+)\s*-\s*(.*?)\s*\((.*?)\)\s*-\s*([A-Za-z0-9+\-?]+)\s*$/);
+  if (!m) return null;
+  return {
+    mcode: m[1].trim(),
+    commonName: m[2].trim(),
+    scientificName: m[3].trim(),
+    indicatorStatus: normalizeStatus(m[4].trim()) || m[4].trim().toUpperCase()
+  };
+}
+
+function speciesDisplay(rec) {
+  const code = rec.mcode ? `${rec.mcode} - ` : '';
+  const common = rec.commonName || 'Unknown';
+  const sci = rec.scientificName || 'Unknown';
+  const status = rec.indicatorStatus || 'NA';
+  return `${code}${common} (${sci}) - ${status}`;
+}
+
+function speciesSearchKey(rec) {
+  return [rec.mcode, rec.elcode, rec.commonName, rec.scientificName].filter(Boolean).join(' ').toLowerCase();
+}
+
 async function loadSpecies() {
   try {
-    const res = await fetch('./VASC_names.json'); if (!res.ok) return;
-    const data = await res.json();
-    const values = Array.isArray(data) ? data : Object.values(data).flatMap(v => Array.isArray(v) ? v : [v]);
-    speciesList = [...new Set(values.map(v => String(v).trim()).filter(Boolean))];
-  } catch {}
+    const [legacyRes, nsRes] = await Promise.all([
+      fetch('./VASC_names.json'),
+      fetch('./species_ns_indicators.json')
+    ]);
+    const legacyRaw = legacyRes.ok ? await legacyRes.json() : [];
+    const nsRaw = nsRes.ok ? await nsRes.json() : [];
+
+    const legacy = (Array.isArray(legacyRaw) ? legacyRaw : [])
+      .map(parseLegacySpeciesLine)
+      .filter(Boolean);
+
+    const bySci = new Map();
+    const byCommon = new Map();
+    nsRaw.forEach(r => {
+      const rec = {
+        elcode: r.elcode || '',
+        scientificName: String(r.scientificName || '').trim(),
+        commonName: String(r.commonName || '').trim(),
+        indicatorStatus: normalizeStatus(r.nsWetlandIndicator || '')
+      };
+      if (rec.scientificName) bySci.set(rec.scientificName.toLowerCase(), rec);
+      if (rec.commonName) byCommon.set(rec.commonName.toLowerCase(), rec);
+    });
+
+    const merged = [];
+    legacy.forEach(l => {
+      const ns = bySci.get((l.scientificName || '').toLowerCase()) || byCommon.get((l.commonName || '').toLowerCase());
+      merged.push({
+        mcode: l.mcode || '',
+        elcode: ns?.elcode || '',
+        scientificName: l.scientificName || ns?.scientificName || '',
+        commonName: l.commonName || ns?.commonName || '',
+        indicatorStatus: ns?.indicatorStatus || l.indicatorStatus || ''
+      });
+    });
+
+    // add NS-only records not present in legacy list
+    nsRaw.forEach(r => {
+      const sci = String(r.scientificName || '').trim();
+      if (!sci) return;
+      if (merged.some(m => (m.scientificName || '').toLowerCase() === sci.toLowerCase())) return;
+      merged.push({
+        mcode: '',
+        elcode: r.elcode || '',
+        scientificName: sci,
+        commonName: String(r.commonName || '').trim(),
+        indicatorStatus: normalizeStatus(r.nsWetlandIndicator || '')
+      });
+    });
+
+    speciesRecords = merged;
+    speciesDisplayMap = new Map();
+    speciesList = merged.map(speciesDisplay);
+    speciesList.forEach((d, i) => speciesDisplayMap.set(d, merged[i]));
+  } catch (err) {
+    console.warn('Species load failed:', err);
+  }
 }
 
 function buildSpeciesDatalist() {
+  document.getElementById('species-options')?.remove();
   const dl = document.createElement('datalist'); dl.id = 'species-options';
-  speciesList.slice(0, 4000).forEach(s => { const o = document.createElement('option'); o.value = s; dl.appendChild(o); });
+  speciesList.slice(0, 6000).forEach(s => { const o = document.createElement('option'); o.value = s; dl.appendChild(o); });
   document.body.appendChild(dl);
+}
+
+function findSpeciesRecord(query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return null;
+  if (speciesDisplayMap.has(query)) return speciesDisplayMap.get(query);
+  return speciesRecords.find(r => speciesSearchKey(r).includes(q)) || null;
+}
+
+function applySpeciesLookup(group, i, raw) {
+  const rec = findSpeciesRecord(raw);
+  if (!rec) {
+    state[`${group}Sp${i}Status`] = '';
+    return;
+  }
+  state[`${group}Sp${i}`] = speciesDisplay(rec);
+  state[`${group}Sp${i}Status`] = rec.indicatorStatus || '';
 }
 
 async function fileToPhotoObject(file) {
@@ -473,8 +612,11 @@ function refreshPhotoPreview() {
 }
 
 function displayLabel(key) {
-  const m = key.match(/^(Tree|Shrub|Herb)Sp(\d+)(Cov)?$/);
-  if (m) return `${m[1]} Species #${m[2]}${m[3] ? ' % Cover' : ''}`;
+  const m = key.match(/^(Tree|Shrub|Herb)Sp(\d+)(Cov|Status|Dom)?$/);
+  if (m) {
+    const suffix = m[3] === 'Cov' ? ' % Cover' : m[3] === 'Status' ? ' Indicator Status' : m[3] === 'Dom' ? ' Dominant?' : '';
+    return `${m[1]} Species #${m[2]}${suffix}`;
+  }
   const h = key.match(/^SoilH(\d+)(ThickCM|Texture|Matrix|MatrixPC|Redox|RedoxPC|RedoxType|RedoxLoc)$/);
   if (h) {
     const map = { ThickCM: 'Thickness (cm)', Texture: 'Texture', Matrix: 'Matrix Color', MatrixPC: 'Matrix %', Redox: 'Redox Color', RedoxPC: 'Redox %', RedoxType: 'Redox Type', RedoxLoc: 'Redox Location' };
@@ -661,6 +803,77 @@ function soilRows(s) {
     }
   }
   return rows.length ? rows : [['H1', '—', '—', '—', '—', '—', '—', '—', '—']];
+}
+
+function vegetationEntries() {
+  const entries = [];
+  const groups = [['Tree', 6], ['Shrub', 6], ['Herb', 10]];
+  groups.forEach(([g, n]) => {
+    for (let i = 1; i <= n; i++) {
+      const sp = state[`${g}Sp${i}`];
+      const cov = Number(state[`${g}Sp${i}Cov`] || 0);
+      const status = normalizeStatus(state[`${g}Sp${i}Status`] || '');
+      const manualDom = !!state[`${g}Sp${i}Dom`];
+      if (!sp && !cov) continue;
+      entries.push({ group: g, i, species: sp || '—', cover: Number.isFinite(cov) ? cov : 0, status, manualDom });
+    }
+  });
+  return entries;
+}
+
+function autoDominantSet(entries) {
+  const byGroup = new Map();
+  entries.forEach(e => {
+    if (!byGroup.has(e.group)) byGroup.set(e.group, []);
+    byGroup.get(e.group).push(e);
+  });
+  const set = new Set();
+  for (const arr of byGroup.values()) {
+    const sorted = [...arr].filter(e => e.cover > 0).sort((a, b) => b.cover - a.cover);
+    let sum = 0;
+    for (let idx = 0; idx < sorted.length; idx++) {
+      const e = sorted[idx];
+      set.add(`${e.group}:${e.i}`);
+      sum += e.cover;
+      if (sum > 50) {
+        const threshold = e.cover;
+        for (let j = idx + 1; j < sorted.length; j++) {
+          if (sorted[j].cover === threshold) set.add(`${sorted[j].group}:${sorted[j].i}`);
+          else break;
+        }
+        break;
+      }
+    }
+  }
+  return set;
+}
+
+function vegetationMetrics() {
+  const entries = vegetationEntries();
+  const autoSet = autoDominantSet(entries);
+  const dominant = entries.filter(e => e.manualDom || autoSet.has(`${e.group}:${e.i}`));
+
+  const dominanceB = dominant.length;
+  const dominanceA = dominant.filter(e => ['OBL', 'FACW', 'FAC'].includes(e.status)).length;
+  const dominancePct = dominanceB ? (dominanceA / dominanceB) * 100 : 0;
+
+  const cover = { OBL: 0, FACW: 0, FAC: 0, FACU: 0, UPL: 0 };
+  entries.forEach(e => { if (cover[e.status] != null) cover[e.status] += (e.cover || 0); });
+
+  const A = cover.OBL + cover.FACW + cover.FAC + cover.FACU + cover.UPL;
+  const B = cover.OBL * 1 + cover.FACW * 2 + cover.FAC * 3 + cover.FACU * 4 + cover.UPL * 5;
+  const prevalenceIndex = A > 0 ? (B / A) : 0;
+
+  return {
+    dominanceA,
+    dominanceB,
+    dominancePct,
+    dominancePass: dominancePct > 50,
+    prevalenceIndex,
+    prevalencePass: A > 0 ? prevalenceIndex <= 3.0 : false,
+    cover,
+    dominant
+  };
 }
 
 function markdownTable(headers, rows) {

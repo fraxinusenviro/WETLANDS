@@ -33,7 +33,7 @@ WETLANDS provides a practical, offline-friendly form workflow for:
 
 - Core wetland delineation fields (including disturbance/problematic conditions and summary determinations)
 - Device geolocation capture (lat/long)
-- Vegetation entries by layer (Tree/Shrub/Herb) with species + cover
+- Vegetation entries by layer (Tree/Shrub/Herb) with species lookup by common/scientific/code, indicator status autofill, cover %, and dominant flag
 - Hydric soil horizon entries and indicator selection
 - Wetland hydrology indicator selection
 - Notes field
@@ -58,6 +58,11 @@ WETLANDS provides a practical, offline-friendly form workflow for:
   - HTML report
   - PDF (Aesthetic report)
   - PDF (Form-Style, NS-reference-inspired layout)
+
+### Vegetation indices
+
+- Dominance Test computed from dominant species entries (with auto-dominance fallback by stratum cover)
+- Prevalence Index computed from indicator-status weighted cover totals (OBL/FACW/FAC/FACU/UPL)
 
 ### Reporting style
 

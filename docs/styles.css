@@ -163,8 +163,9 @@ button.primary {
 .veg-count { min-width:2rem; text-align:center; color:var(--muted); font-size:.9rem; }
 
 .veg-table { display:grid; gap:.42rem; }
-.veg-row { display:grid; grid-template-columns: 42px 1fr 120px; gap:.5rem; align-items:center; }
+.veg-row { display:grid; grid-template-columns: 42px minmax(220px,1fr) 110px 90px 62px; gap:.5rem; align-items:center; }
 .veg-row input { width:100%; padding:.52rem .56rem; border-radius:.45rem; border:1px solid #324869; background:#0f1827; color:var(--text); }
+.veg-row input[type='checkbox'] { width:18px; height:18px; justify-self:center; accent-color:#4cd18f; padding:0; }
 .veg-header { color:var(--muted); font-size:.84rem; font-weight:600; padding:0 .1rem; }
 .veg-idx { color:var(--muted); text-align:center; font-weight:600; }
 
