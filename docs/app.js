@@ -2002,9 +2002,66 @@ async function exportRecordPdf(s, base) {
     const desc = restrictive === 'Yes' ? (note || 'Restrictive layer') : r[4];
     return [r[0], range, r[3], desc, r[5], r[6], r[7], r[8], r[9], r[10]];
   });
-  drawTable('Hydric Soils', ['Horizon','Depth Range (cm)','Thickness (cm)','Texture / Note','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilsPdfRows,
-    [contentW*0.07,contentW*0.16,contentW*0.09,contentW*0.15,contentW*0.13,contentW*0.06,contentW*0.13,contentW*0.06,contentW*0.08,contentW*0.07],
-    { wrapCells: true, fontSize: 6.8 });
+
+  sectionTitle('Hydric Soils');
+  const soilsW = [contentW*0.07,contentW*0.16,contentW*0.09,contentW*0.15,contentW*0.13,contentW*0.06,contentW*0.13,contentW*0.06,contentW*0.08,contentW*0.07];
+  const topHeaderH = 12;
+  const subHeaderH = 12;
+  const baseRowH = 12;
+  ensureSpace(topHeaderH + subHeaderH + (soilsPdfRows.length * baseRowH) + 18);
+
+  doc.setDrawColor(...colors.line);
+  doc.setFillColor(...colors.head);
+  doc.rect(margin, y, contentW, topHeaderH, 'FD');
+
+  const xAt = (idx) => margin + soilsW.slice(0, idx).reduce((a,b)=>a+b,0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.2);
+  doc.setTextColor(...colors.ink);
+  doc.text('Matrix', xAt(4) + ((soilsW[4]+soilsW[5])/2), y + 8, { align: 'center' });
+  doc.text('Redox', xAt(6) + ((soilsW[6]+soilsW[7]+soilsW[8]+soilsW[9])/2), y + 8, { align: 'center' });
+
+  y += topHeaderH;
+  doc.setFillColor(...colors.head);
+  doc.rect(margin, y, contentW, subHeaderH, 'FD');
+  const subHeaders = ['Horizon','Depth Range (cm)','Thickness (cm)','Texture / Note','Color','%','Color','%','Type','Location'];
+  let sx = margin;
+  subHeaders.forEach((h, i) => {
+    doc.text(h, sx + 2, y + 8.5);
+    sx += soilsW[i];
+  });
+
+  let vx = margin;
+  for (let i = 0; i < soilsW.length - 1; i++) {
+    vx += soilsW[i];
+    doc.line(vx, y - topHeaderH, vx, y + subHeaderH + (soilsPdfRows.length * baseRowH));
+  }
+
+  y += subHeaderH;
+  soilsPdfRows.forEach(r => {
+    const wrapped = r.map((cell, i) => {
+      const lines = doc.splitTextToSize(String(cell ?? '—'), soilsW[i] - 5);
+      return lines.length ? lines : ['—'];
+    });
+    const rowH = Math.max(baseRowH, ...wrapped.map(lines => (lines.length * 7.8) + 4));
+    ensureSpace(rowH + 2);
+    doc.rect(margin, y, contentW, rowH);
+    let rx = margin;
+    wrapped.forEach((lines, i) => {
+      doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
+      lines.forEach((ln, li) => doc.text(String(ln), rx + 2, y + 8 + (li * 7.8)));
+      rx += soilsW[i];
+    });
+    y += rowH;
+  });
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.2);
+  doc.setTextColor(...colors.muted);
+  const hydricList = (s.HydricSoilIndicators || []).join(', ') || '—';
+  const hydricLines = doc.splitTextToSize(`Selected Hydric Soil Indicators: ${hydricList}`, contentW);
+  doc.text(hydricLines, margin, y + 8);
+  y += (hydricLines.length * 8) + 4;
 
   const hydroRows = [
     ['Restrictive Layer', s.RestrictiveLayer || '—'],
@@ -2278,11 +2335,65 @@ async function exportRecordPdfFormStyle(s, base) {
     const desc = restrictive === 'Yes' ? (note || 'Restrictive layer') : r[4];
     return [r[0], range, r[3], desc, r[5], r[6], r[7], r[8], r[9], r[10]];
   });
-  drawTable(['Horizon', 'Depth Range (cm)', 'Thickness (cm)', 'Texture / Note', 'Matrix Color', 'Matrix %', 'Redox Color', 'Redox %', 'Redox Type', 'Redox Location'], soilsFormRows,
-    [contentW*0.07,contentW*0.16,contentW*0.09,contentW*0.15,contentW*0.13,contentW*0.06,contentW*0.13,contentW*0.06,contentW*0.08,contentW*0.07],
-    { wrapCells: true, fontSize: 6.8 });
+
+  const soilsW2 = [contentW*0.07,contentW*0.16,contentW*0.09,contentW*0.15,contentW*0.13,contentW*0.06,contentW*0.13,contentW*0.06,contentW*0.08,contentW*0.07];
+  const topHeaderH2 = 12;
+  const subHeaderH2 = 12;
+  const baseRowH2 = 12;
+  ensureSpace(topHeaderH2 + subHeaderH2 + (soilsFormRows.length * baseRowH2) + 16);
+
+  doc.setFillColor(226, 232, 240);
+  doc.setDrawColor(203, 213, 225);
+  doc.rect(margin, y, contentW, topHeaderH2, 'FD');
+
+  const xAt2 = (idx) => margin + soilsW2.slice(0, idx).reduce((a,b)=>a+b,0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.2);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Matrix', xAt2(4) + ((soilsW2[4]+soilsW2[5])/2), y + 8, { align: 'center' });
+  doc.text('Redox', xAt2(6) + ((soilsW2[6]+soilsW2[7]+soilsW2[8]+soilsW2[9])/2), y + 8, { align: 'center' });
+
+  y += topHeaderH2;
+  doc.rect(margin, y, contentW, subHeaderH2, 'FD');
+  const subHeaders2 = ['Horizon','Depth Range (cm)','Thickness (cm)','Texture / Note','Color','%','Color','%','Type','Location'];
+  let sx2 = margin;
+  subHeaders2.forEach((h, i) => {
+    doc.text(h, sx2 + 2, y + 8.5);
+    sx2 += soilsW2[i];
+  });
+
+  let vx2 = margin;
+  for (let i = 0; i < soilsW2.length - 1; i++) {
+    vx2 += soilsW2[i];
+    doc.line(vx2, y - topHeaderH2, vx2, y + subHeaderH2 + (soilsFormRows.length * baseRowH2));
+  }
+
+  y += subHeaderH2;
+  soilsFormRows.forEach(r => {
+    const wrapped = r.map((cell, i) => {
+      const lines = doc.splitTextToSize(String(cell ?? '—'), soilsW2[i] - 5);
+      return lines.length ? lines : ['—'];
+    });
+    const rowH = Math.max(baseRowH2, ...wrapped.map(lines => (lines.length * 7.8) + 4));
+    ensureSpace(rowH + 2);
+    doc.rect(margin, y, contentW, rowH);
+    let rx = margin;
+    wrapped.forEach((lines, i) => {
+      doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
+      lines.forEach((ln, li) => doc.text(String(ln), rx + 2, y + 8 + (li * 7.8)));
+      rx += soilsW2[i];
+    });
+    y += rowH;
+  });
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.2);
+  doc.setTextColor(71, 85, 105);
+  const hydricList2 = (s.HydricSoilIndicators || []).join(', ') || '—';
+  const hydricLines2 = doc.splitTextToSize(`Selected Hydric Soil Indicators: ${hydricList2}`, contentW);
+  doc.text(hydricLines2, margin, y + 8);
+  y += (hydricLines2.length * 8) + 4;
   drawKV([
-    ['Hydric Soil Indicators', (s.HydricSoilIndicators || []).join(', ') || '—'],
     ['Restrictive Layer', s.RestrictiveLayer || '—'],
     ['Restrictive Layer Depth (cm)', s.RestrictiveLayerDepthCM || '—']
   ], 0.38);
