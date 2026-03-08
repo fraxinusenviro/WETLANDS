@@ -456,7 +456,7 @@ function renderSubmissions() {
 
   [...surveys].reverse().forEach(s => {
     const item = document.createElement('div'); item.className = 'submission-item';
-    item.innerHTML = `<h4>${s.SiteID || 'Untitled Site'} · ${s.PLOT_ID || 'No Plot ID'}</h4><p>${new Date(s.timestamp).toLocaleString()}</p><div class='row'><button data-view='${s.id}'>Preview</button><button data-load='${s.id}'>Load into form</button><button data-delete='${s.id}'>Delete</button><button data-export='geojson:${s.id}'>GeoJSON</button><button data-export='md:${s.id}'>Markdown</button><button data-export='csv:${s.id}'>CSV</button><button data-export='html:${s.id}'>HTML</button><button data-export='pdf:${s.id}'>PDF</button><button data-export='pdf_form:${s.id}'>PDF (Form-Style)</button></div>`;
+    item.innerHTML = `<h4>${s.SiteID || 'Untitled Site'} · ${s.PLOT_ID || 'No Plot ID'}</h4><p>${new Date(s.timestamp).toLocaleString()}</p><div class='row'><button data-view='${s.id}'>Preview</button><button data-load='${s.id}'>Load into form</button><button data-delete='${s.id}'>Delete</button><button data-export='geojson:${s.id}'>GeoJSON</button><button data-export='md:${s.id}'>Markdown</button><button data-export='csv:${s.id}'>CSV</button><button data-export='html:${s.id}'>HTML</button><button data-export='pdf:${s.id}'>PDF</button></div>`;
     list.appendChild(item);
   });
 
@@ -1479,9 +1479,9 @@ async function exportRecordPdf(s, base) {
 
   const vMetrics = vegetationMetricsFromSurvey(s);
   drawTable('Vegetation Indices', ['Metric', 'Value'], [
-    ['Dominance Test (A/B)', `${vMetrics.dominanceA}/${vMetrics.dominanceB} (${vMetrics.dominancePct.toFixed(1)}%)`],
+    ['Dominance Test', `${vMetrics.dominanceA}/${vMetrics.dominanceB} (${vMetrics.dominancePct.toFixed(1)}%)`],
     ['Dominance Pass (>50%)', vMetrics.dominancePass ? 'Yes' : 'No'],
-    ['Prevalence Index (B/A)', vMetrics.prevalenceIndex.toFixed(2)],
+    ['Prevalence Index', vMetrics.prevalenceIndex.toFixed(2)],
     ['Prevalence Pass (<=3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
   ], [contentW * 0.45, contentW * 0.55], { showHeader: false, boldLeftColumn: true });
 
@@ -1490,7 +1490,7 @@ async function exportRecordPdf(s, base) {
   doc.setFontSize(6.5);
   doc.setTextColor(...colors.muted);
   const fp1 = 'Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): rank by absolute cover, include species cumulatively exceeding 50% of stratum cover, plus any additional species at >=20% of stratum cover.';
-  const fp2 = 'Prevalence Index = (OBL*1 + FACW*2 + FAC*3 + FACU*4 + UPL*5) / total vegetative cover across those indicator classes.';
+  const fp2 = 'Prevalence Index is a weighted cover score using indicator-status classes (OBL, FACW, FAC, FACU, UPL).';
   const fp1Lines = doc.splitTextToSize(fp1, contentW);
   const fp2Lines = doc.splitTextToSize(fp2, contentW);
   doc.text(fp1Lines, margin, y + 7);
@@ -1853,15 +1853,6 @@ async function exportRecord(fmt, raw) {
       alert('PDF export failed in this browser. Downloading printable HTML fallback.');
       const payload = recordHTML(full);
       return smartExport({ content: payload, filename: `${base}_printable.html`, mime: 'text/html;charset=utf-8' });
-    }
-  }
-  if (fmt === 'pdf_form') {
-    try {
-      return await exportRecordPdfFormStyle(full, base);
-    } catch (err) {
-      console.error('Form-style PDF export failed:', err);
-      alert('Form-style PDF export failed in this browser. Falling back to standard PDF.');
-      return await exportRecordPdf(full, base);
     }
   }
 }

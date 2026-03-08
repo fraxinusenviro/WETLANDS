@@ -64,7 +64,6 @@ WETLANDS provides a practical, offline-friendly form workflow for:
   - Markdown
   - HTML report
   - PDF (Aesthetic report)
-  - PDF (Form-Style, NS-reference-inspired layout)
 
 ### Vegetation indices
 
