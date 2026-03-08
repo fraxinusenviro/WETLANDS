@@ -2,6 +2,9 @@ const yesNo = ["", "Yes", "No"];
 const observers = ["", "IB", "ZS", "SD", "CN", "Other"];
 const provinces = ["", "NS", "PEI", "NB", "NL"];
 const plotTypes = ["", "Wetland Control Plot", "Upland Control Plot"];
+const localReliefOptions = ["", "Convex", "Concave", "None"];
+const redoxTypeOptions = ["", "Concentrations", "Depletions", "Pore Linings", "Nodules", "Masses", "Soft Masses", "Other"];
+const redoxLocationOptions = ["", "Matrix", "Pore", "Root Channel", "Ped Face", "Combined", "Other"];
 const pageOrder = ["metadata", "vegetation", "hydrology", "soils"];
 
 const hydricSoilIndicators = ["Histosol (A1)","Histic Epipedon (A2)","Black Histic (A3)","Hydrogen Sulfide (A4)","Stratified Layers (A5)","Depleted Below Dark Surface (A11)","Thick Dark Surface (A12)","Sandy Mucky Mineral (S1)","Sandy Gleyed Matrix (S4)","Sandy Redox (S5)","Polyvalue Below Surface (S8)","Thin Dark Surface (S9)","Loamy Gleyed Matrix (F2)","Depleted Matrix (F3)","Redox Dark Surface (F6)","Depleted Dark Surface (F7)","Redox Depressions (F8)"];
@@ -11,6 +14,7 @@ const wetlandHydrologySecondary = ["Surface Soil Cracks (B6)","Drainage Patterns
 const metadataFields = [
   ["SiteID", "text"], ["LocaleName", "text"], ["Province", "select", provinces], ["date", "date"], ["time", "time"], ["observer", "select", observers],
   ["PLOT_ID", "text"], ["WetlandID", "text"], ["PLOT_TYPE", "select", plotTypes], ["latitude", "number"], ["longitude", "number"],
+  ["LocalRelief", "select", localReliefOptions], ["PercentSlope", "number"], ["Landform", "text"],
   ["DistSoilYN", "select", yesNo], ["DistVegYN", "select", yesNo], ["DistHydroYN", "select", yesNo], ["ProbSoilYN", "select", yesNo], ["ProbVegYN", "select", yesNo], ["ProbHydroYN", "select", yesNo],
   ["ClimHydroNormalYN", "select", yesNo], ["CircNormalYN", "select", yesNo], ["SummaryHydroVegYN", "select", yesNo], ["SummaryHydricSoilYN", "select", yesNo], ["SummaryHydrologyYN", "select", yesNo], ["SummaryInWetlandYN", "select", yesNo]
 ];
@@ -70,7 +74,7 @@ async function init() {
 
 function defaultSurvey() {
   const now = new Date();
-  const obj = { id: makeId(), timestamp: new Date().toISOString(), SiteID:"", LocaleName:"", Province:"", date: now.toISOString().slice(0,10), time: now.toTimeString().slice(0,5), observer:"", PLOT_ID:"", WetlandID:"", PLOT_TYPE:"", latitude:"", longitude:"", DistSoilYN:"", DistVegYN:"", DistHydroYN:"", ProbSoilYN:"", ProbVegYN:"", ProbHydroYN:"", ClimHydroNormalYN:"", CircNormalYN:"", SummaryHydroVegYN:"", SummaryHydricSoilYN:"", SummaryHydrologyYN:"", SummaryInWetlandYN:"", notes:"", RestrictiveLayer:"", RestrictiveLayerDepthCM:"", SurfaceWaterYN:"", SurfaceWaterDepthCM:"", WaterTableYN:"", WaterTableDepthCM:"", SaturationYN:"", SaturationDepthCM:"", HydricSoilIndicators:[], HydrologyPrimary:[], HydrologySecondary:[], photos:[] };
+  const obj = { id: makeId(), timestamp: new Date().toISOString(), SiteID:"", LocaleName:"", Province:"", date: now.toISOString().slice(0,10), time: now.toTimeString().slice(0,5), observer:"", PLOT_ID:"", WetlandID:"", PLOT_TYPE:"", latitude:"", longitude:"", LocalRelief:"", PercentSlope:"", Landform:"", DistSoilYN:"", DistVegYN:"", DistHydroYN:"", ProbSoilYN:"", ProbVegYN:"", ProbHydroYN:"", ClimHydroNormalYN:"", CircNormalYN:"", SummaryHydroVegYN:"", SummaryHydricSoilYN:"", SummaryHydrologyYN:"", SummaryInWetlandYN:"", notes:"", RestrictiveLayer:"", RestrictiveLayerDepthCM:"", SurfaceWaterYN:"", SurfaceWaterDepthCM:"", WaterTableYN:"", WaterTableDepthCM:"", SaturationYN:"", SaturationDepthCM:"", HydricSoilIndicators:[], HydrologyPrimary:[], HydrologySecondary:[], photos:[] };
   ["Tree","Shrub"].forEach(g => { for (let i=1;i<=6;i++) { obj[`${g}Sp${i}`]=""; obj[`${g}Sp${i}Cov`]=""; obj[`${g}Sp${i}Status`]=""; obj[`${g}Sp${i}Dom`]=false; } });
   for (let i=1;i<=10;i++) { obj[`HerbSp${i}`]=""; obj[`HerbSp${i}Cov`]=""; obj[`HerbSp${i}Status`]=""; obj[`HerbSp${i}Dom`]=false; }
   for (let h=1;h<=4;h++) ["ThickCM","Texture","Matrix","MatrixPC","Redox","RedoxPC","RedoxType","RedoxLoc"].forEach(s => obj[`SoilH${h}${s}`]="");
@@ -137,7 +141,15 @@ function sectionCard(title, child) {
 
 function renderMetadata() {
   const root = document.getElementById('metadata-fields'); root.innerHTML = '';
-  metadataFields.forEach(([n,t,o]) => root.appendChild(fieldEl(n,t,o)));
+  metadataFields.forEach(([n,t,o]) => {
+    root.appendChild(fieldEl(n,t,o));
+    if (n === 'longitude') {
+      const locWrap = document.createElement('div');
+      locWrap.className = 'field';
+      locWrap.innerHTML = `<label>GPS Capture</label><button type='button' id='btn-location'>Use Device Location</button>`;
+      root.appendChild(locWrap);
+    }
+  });
   root.appendChild(fieldEl('notes','textarea'));
   const photoWrap = document.createElement('div');
   photoWrap.className = 'field';
@@ -313,51 +325,58 @@ function renderSoils() {
         const row = document.createElement('div');
         row.className = 'soil-row';
 
-        const c1 = document.createElement('div');
-        c1.className = 'soil-cell';
-        c1.innerHTML = `<label>${l1}</label>`;
-        const i1 = document.createElement('input');
-        i1.type = t1; if (t1 === 'number') i1.step = 'any';
-        i1.value = state[k1] ?? '';
-        if (/SoilH\d+(Matrix|Redox)$/.test(k1)) {
-          i1.setAttribute('list', 'munsell-options');
-          i1.placeholder = 'e.g., 10YR 4/3';
-          i1.title = 'Enter a Munsell code to auto-attach the color description.';
-        }
-        i1.oninput = () => { state[k1] = i1.value; queueAutosave(); };
-        i1.onblur = () => {
-          if (/SoilH\d+(Matrix|Redox)$/.test(k1)) {
-            const normalized = munsellDisplay(i1.value);
-            i1.value = normalized;
-            state[k1] = normalized;
-            queueAutosave();
-          }
-        };
-        c1.appendChild(i1);
+        const buildSoilInput = (label, key, type) => {
+          const cell = document.createElement('div');
+          cell.className = 'soil-cell';
+          cell.innerHTML = `<label>${label}</label>`;
 
-        const c2 = document.createElement('div');
-        c2.className = 'soil-cell';
-        c2.innerHTML = `<label>${l2}</label>`;
-        const i2 = document.createElement('input');
-        i2.type = t2; if (t2 === 'number') i2.step = 'any';
-        i2.value = state[k2] ?? '';
-        if (/SoilH\d+(Matrix|Redox)$/.test(k2)) {
-          i2.setAttribute('list', 'munsell-options');
-          i2.placeholder = 'e.g., 10YR 4/3';
-          i2.title = 'Enter a Munsell code to auto-attach the color description.';
-        }
-        i2.oninput = () => { state[k2] = i2.value; queueAutosave(); };
-        i2.onblur = () => {
-          if (/SoilH\d+(Matrix|Redox)$/.test(k2)) {
-            const normalized = munsellDisplay(i2.value);
-            i2.value = normalized;
-            state[k2] = normalized;
-            queueAutosave();
+          let input;
+          if (/SoilH\d+RedoxType$/.test(key)) {
+            input = document.createElement('select');
+            redoxTypeOptions.forEach(v => {
+              const o = document.createElement('option');
+              o.value = v;
+              o.textContent = v || '—';
+              input.appendChild(o);
+            });
+            input.value = state[key] ?? '';
+            input.onchange = () => { state[key] = input.value; queueAutosave(); };
+          } else if (/SoilH\d+RedoxLoc$/.test(key)) {
+            input = document.createElement('select');
+            redoxLocationOptions.forEach(v => {
+              const o = document.createElement('option');
+              o.value = v;
+              o.textContent = v || '—';
+              input.appendChild(o);
+            });
+            input.value = state[key] ?? '';
+            input.onchange = () => { state[key] = input.value; queueAutosave(); };
+          } else {
+            input = document.createElement('input');
+            input.type = type;
+            if (type === 'number') input.step = 'any';
+            input.value = state[key] ?? '';
+            if (/SoilH\d+(Matrix|Redox)$/.test(key)) {
+              input.setAttribute('list', 'munsell-options');
+              input.placeholder = 'e.g., 10YR 4/3';
+              input.title = 'Enter a Munsell code to auto-attach the color description.';
+            }
+            input.oninput = () => { state[key] = input.value; queueAutosave(); };
+            input.onblur = () => {
+              if (/SoilH\d+(Matrix|Redox)$/.test(key)) {
+                const normalized = munsellDisplay(input.value);
+                input.value = normalized;
+                state[key] = normalized;
+                queueAutosave();
+              }
+            };
           }
-        };
-        c2.appendChild(i2);
 
-        row.append(c1, c2);
+          cell.appendChild(input);
+          return cell;
+        };
+
+        row.append(buildSoilInput(l1, k1, t1), buildSoilInput(l2, k2, t2));
         table.appendChild(row);
       });
       card.appendChild(table);
@@ -517,7 +536,7 @@ function renderSubmissions() {
 
   list.querySelectorAll('button[data-view]').forEach(b => b.onclick = () => {
     const id = b.dataset.view; const s = surveys.find(x => x.id === id); if (!s) return;
-    const previewKeys = ['PLOT_ID','LocaleName','observer','latitude','longitude','DistSoilYN','DistVegYN','DistHydroYN','SummaryHydroVegYN','SummaryHydricSoilYN','SummaryHydrologyYN','SummaryInWetlandYN','notes'];
+    const previewKeys = ['PLOT_ID','LocaleName','observer','latitude','longitude','LocalRelief','PercentSlope','Landform','DistSoilYN','DistVegYN','DistHydroYN','SummaryHydroVegYN','SummaryHydricSoilYN','SummaryHydrologyYN','SummaryInWetlandYN','notes'];
     detail.innerHTML = `<h3>${s.SiteID || 'Untitled Site'}</h3><p class='muted'>${new Date(s.timestamp).toLocaleString()}</p><div>${previewKeys.map(k => `<p><strong>${displayLabel(k)}:</strong> ${s[k] ?? ''}</p>`).join('')}<p><strong>Photos:</strong> ${(s.photos||[]).map(p=>p.name).join(', ') || '—'}</p></div>`;
   });
 
@@ -869,7 +888,7 @@ function displayLabel(key) {
     return `Soil Horizon ${h[1]} ${map[h[2]]}`;
   }
   const fixed = {
-    SiteID: 'Site ID', LocaleName: 'Locale', PLOT_ID: 'Plot ID', WetlandID: 'Wetland ID', PLOT_TYPE: 'Plot Type',
+    SiteID: 'Site ID', LocaleName: 'Locale', PLOT_ID: 'Plot ID', WetlandID: 'Wetland ID', PLOT_TYPE: 'Plot Type', LocalRelief: 'Local Relief', PercentSlope: '% Slope', Landform: 'Landform',
     DistSoilYN: 'Disturbed Soils?', DistVegYN: 'Disturbed Vegetation?', DistHydroYN: 'Disturbed Hydrology?',
     ProbSoilYN: 'Problematic Soils?', ProbVegYN: 'Problematic Vegetation?', ProbHydroYN: 'Problematic Hydrology?',
     ClimHydroNormalYN: 'Normal Climatic Conditions?', CircNormalYN: 'Normal Circumstances Present?',
@@ -1195,7 +1214,7 @@ function recordMarkdown(s) {
     `## 1. Survey Metadata`
   ];
 
-  ['SiteID','LocaleName','observer','latitude','longitude','Province','date','time','PLOT_TYPE','WetlandID'].forEach(k => {
+  ['SiteID','LocaleName','observer','latitude','longitude','LocalRelief','PercentSlope','Landform','Province','date','time','PLOT_TYPE','WetlandID'].forEach(k => {
     lines.push(`- **${displayLabel(k)}:** ${s[k] || '—'}`);
   });
 
@@ -1237,6 +1256,9 @@ function recordHTML(s) {
     ['Time', val('time')],
     ['Latitude', val('latitude')],
     ['Longitude', val('longitude')],
+    ['Local Relief', val('LocalRelief')],
+    ['% Slope', val('PercentSlope')],
+    ['Landform', val('Landform')],
     ['Plot Type', val('PLOT_TYPE')]
   ];
 
@@ -1683,6 +1705,9 @@ async function exportRecordPdf(s, base) {
     ['Time', s.time || '—'],
     ['Latitude', s.latitude || '—'],
     ['Longitude', s.longitude || '—'],
+    ['Local Relief', s.LocalRelief || '—'],
+    ['% Slope', s.PercentSlope || '—'],
+    ['Landform', s.Landform || '—'],
     ['Plot Type', s.PLOT_TYPE || '—']
   ];
 
@@ -1738,7 +1763,7 @@ async function exportRecordPdf(s, base) {
 
   const soilsRows = soilRows(s, true, true);
   drawTable('Hydric Soils', ['Horizon','Thickness (cm)','Texture','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilsRows,
-    [contentW*0.07,contentW*0.11,contentW*0.10,contentW*0.19,contentW*0.07,contentW*0.19,contentW*0.07,contentW*0.10,contentW*0.10],
+    [contentW*0.06,contentW*0.10,contentW*0.10,contentW*0.18,contentW*0.06,contentW*0.18,contentW*0.07,contentW*0.12,contentW*0.13],
     { wrapCells: true });
 
   const hydroRows = [
@@ -1950,7 +1975,10 @@ async function exportRecordPdfFormStyle(s, base) {
     ['Plot Type', s.PLOT_TYPE || '—'],
     ['Province', s.Province || '—'],
     ['Latitude', s.latitude || '—'],
-    ['Longitude', s.longitude || '—']
+    ['Longitude', s.longitude || '—'],
+    ['Local Relief', s.LocalRelief || '—'],
+    ['% Slope', s.PercentSlope || '—'],
+    ['Landform', s.Landform || '—']
   ]);
 
   sectionBar('Site Conditions');
@@ -2002,7 +2030,7 @@ async function exportRecordPdfFormStyle(s, base) {
 
   sectionBar('Soils');
   drawTable(['Horizon', 'Thickness (cm)', 'Texture', 'Matrix Color', 'Matrix %', 'Redox Color', 'Redox %', 'Redox Type', 'Redox Location'], soilRows(s, true, true),
-    [contentW*0.07,contentW*0.11,contentW*0.10,contentW*0.19,contentW*0.07,contentW*0.19,contentW*0.07,contentW*0.10,contentW*0.10],
+    [contentW*0.06,contentW*0.10,contentW*0.10,contentW*0.18,contentW*0.06,contentW*0.18,contentW*0.07,contentW*0.12,contentW*0.13],
     { wrapCells: true });
   drawKV([
     ['Hydric Soil Indicators', (s.HydricSoilIndicators || []).join(', ') || '—'],

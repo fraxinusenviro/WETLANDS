@@ -228,7 +228,7 @@ button.primary {
 .soil-row { display:grid; grid-template-columns: 1fr 1fr; gap:.5rem; }
 .soil-cell { display:grid; gap:.25rem; }
 .soil-cell label { color:var(--muted); font-size:.82rem; }
-.soil-cell input { width:100%; padding:.5rem .55rem; border-radius:.45rem; border:1px solid #324869; background:#0f1827; color:var(--text); }
+.soil-cell input, .soil-cell select { width:100%; padding:.5rem .55rem; border-radius:.45rem; border:1px solid #324869; background:#0f1827; color:var(--text); }
 
 .instructions-popover {
   width: min(640px, 92vw);
