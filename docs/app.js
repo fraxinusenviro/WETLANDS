@@ -25,6 +25,7 @@ const SURVEYS_KEY = 'wetlandSurveys';
 let speciesList = ["ACERrubr", "PICErube", "QUERrubr", "KALMangu", "VIBUcass", "PTERaqui"];
 let speciesRecords = [];
 let speciesDisplayMap = new Map();
+let munsellDescriptions = new Map();
 let plantReferenceRecords = [];
 let speciesDataDictionary = {};
 let state = defaultSurvey();
@@ -55,7 +56,9 @@ async function init() {
   state = (await loadDraft()) || defaultSurvey();
 
   await loadSpecies();
+  await loadMunsellDescriptions();
   buildSpeciesDatalist();
+  buildMunsellDatalist();
   buildTabs();
   renderFormPages();
   bindActions();
@@ -316,7 +319,20 @@ function renderSoils() {
         const i1 = document.createElement('input');
         i1.type = t1; if (t1 === 'number') i1.step = 'any';
         i1.value = state[k1] ?? '';
+        if (/SoilH\d+(Matrix|Redox)$/.test(k1)) {
+          i1.setAttribute('list', 'munsell-options');
+          i1.placeholder = 'e.g., 10YR 4/3';
+          i1.title = 'Enter a Munsell code to auto-attach the color description.';
+        }
         i1.oninput = () => { state[k1] = i1.value; queueAutosave(); };
+        i1.onblur = () => {
+          if (/SoilH\d+(Matrix|Redox)$/.test(k1)) {
+            const normalized = munsellDisplay(i1.value);
+            i1.value = normalized;
+            state[k1] = normalized;
+            queueAutosave();
+          }
+        };
         c1.appendChild(i1);
 
         const c2 = document.createElement('div');
@@ -325,7 +341,20 @@ function renderSoils() {
         const i2 = document.createElement('input');
         i2.type = t2; if (t2 === 'number') i2.step = 'any';
         i2.value = state[k2] ?? '';
+        if (/SoilH\d+(Matrix|Redox)$/.test(k2)) {
+          i2.setAttribute('list', 'munsell-options');
+          i2.placeholder = 'e.g., 10YR 4/3';
+          i2.title = 'Enter a Munsell code to auto-attach the color description.';
+        }
         i2.oninput = () => { state[k2] = i2.value; queueAutosave(); };
+        i2.onblur = () => {
+          if (/SoilH\d+(Matrix|Redox)$/.test(k2)) {
+            const normalized = munsellDisplay(i2.value);
+            i2.value = normalized;
+            state[k2] = normalized;
+            queueAutosave();
+          }
+        };
         c2.appendChild(i2);
 
         row.append(c1, c2);
@@ -377,6 +406,13 @@ function bindActions() {
     await refreshDashboard();
     showView('home');
   };
+
+  document.getElementById('btn-instructions')?.addEventListener('click', () => {
+    document.getElementById('instructions-popover')?.showModal();
+  });
+  document.getElementById('btn-close-instructions')?.addEventListener('click', () => {
+    document.getElementById('instructions-popover')?.close();
+  });
   document.getElementById('btn-launch-new').onclick = () => { state = defaultSurvey(); renderFormPages(); queueAutosave(true); showView('form'); };
   document.getElementById('btn-open-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); showView('submissions'); };
   document.getElementById('btn-open-drafts').onclick = async () => { draftsLibrary = await loadDraftLibrary(); renderDraftsLibrary(); showView('drafts'); };
@@ -734,6 +770,51 @@ function buildSpeciesDatalist() {
   document.body.appendChild(dl);
 }
 
+function normalizeMunsellCode(input) {
+  return String(input || '').toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+function munsellDescriptionFor(input) {
+  const code = normalizeMunsellCode(input);
+  if (!code) return '';
+  if (munsellDescriptions.has(code)) return munsellDescriptions.get(code);
+  const base = code.match(/([0-9]{1,2}(?:\.[0-9])?[A-Z]{1,3})\s+([0-9](?:\.[0-9])?\/[0-9]+)/);
+  if (!base) return '';
+  const normalized = `${base[1]} ${base[2]}`;
+  return munsellDescriptions.get(normalized) || '';
+}
+
+function munsellDisplay(input) {
+  const code = normalizeMunsellCode(input).replace(/\s*\([^)]*\)\s*$/, '');
+  const desc = munsellDescriptionFor(code);
+  return desc ? `${code} (${desc})` : code;
+}
+
+async function loadMunsellDescriptions() {
+  try {
+    const res = await fetch('./munsell_descriptions.json');
+    const raw = res.ok ? await res.json() : {};
+    munsellDescriptions = new Map(Object.entries(raw || {}).map(([k, v]) => [normalizeMunsellCode(k), String(v || '').trim()]));
+  } catch (err) {
+    console.warn('Munsell description table load failed:', err);
+    munsellDescriptions = new Map();
+  }
+}
+
+function buildMunsellDatalist() {
+  document.getElementById('munsell-options')?.remove();
+  const dl = document.createElement('datalist');
+  dl.id = 'munsell-options';
+  [...munsellDescriptions.keys()].forEach(code => {
+    const o = document.createElement('option');
+    o.value = code;
+    const desc = munsellDescriptions.get(code);
+    o.label = desc ? `${code} (${desc})` : code;
+    dl.appendChild(o);
+  });
+  document.body.appendChild(dl);
+}
+
 function findSpeciesRecord(query) {
   const q = String(query || '').trim().toLowerCase();
   if (!q) return null;
@@ -974,18 +1055,20 @@ function speciesRows(s, group, n) {
   return rows.length ? rows : [['—', '—']];
 }
 
-function soilRows(s) {
+function soilRows(s, includeMunsellDescriptions = false) {
   const rows = [];
   for (let h = 1; h <= 4; h++) {
     const thick = s[`SoilH${h}ThickCM`];
     const texture = s[`SoilH${h}Texture`];
-    const matrix = s[`SoilH${h}Matrix`];
+    const matrixRaw = s[`SoilH${h}Matrix`];
+    const matrix = includeMunsellDescriptions ? munsellDisplay(matrixRaw) : (matrixRaw || '—');
     const matrixPC = s[`SoilH${h}MatrixPC`];
-    const redox = s[`SoilH${h}Redox`];
+    const redoxRaw = s[`SoilH${h}Redox`];
+    const redox = includeMunsellDescriptions ? munsellDisplay(redoxRaw) : (redoxRaw || '—');
     const redoxPC = s[`SoilH${h}RedoxPC`];
     const redoxType = s[`SoilH${h}RedoxType`];
     const redoxLoc = s[`SoilH${h}RedoxLoc`];
-    if ([thick, texture, matrix, matrixPC, redox, redoxPC, redoxType, redoxLoc].some(Boolean)) {
+    if ([thick, texture, matrixRaw, matrixPC, redoxRaw, redoxPC, redoxType, redoxLoc].some(Boolean)) {
       rows.push([`H${h}`, thick || '—', texture || '—', matrix || '—', matrixPC || '—', redox || '—', redoxPC || '—', redoxType || '—', redoxLoc || '—']);
     }
   }
@@ -1634,7 +1717,7 @@ async function exportRecordPdf(s, base) {
   newPage();
   drawHeader();
 
-  const soilsRows = soilRows(s);
+  const soilsRows = soilRows(s, true);
   drawTable('Hydric Soils', ['Hor','Thk','Texture','Matrix','M%','Redox','R%','Type','Loc'], soilsRows,
     [contentW*0.07,contentW*0.09,contentW*0.12,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.16]);
 
@@ -1886,7 +1969,7 @@ async function exportRecordPdfFormStyle(s, base) {
   y += fp2Lines.length * 7 + 5;
 
   sectionBar('Soils');
-  drawTable(['Hor', 'Thk (cm)', 'Texture', 'Matrix', 'M%', 'Redox', 'R%', 'Type', 'Loc'], soilRows(s),
+  drawTable(['Hor', 'Thk (cm)', 'Texture', 'Matrix', 'M%', 'Redox', 'R%', 'Type', 'Loc'], soilRows(s, true),
     [contentW*0.07,contentW*0.1,contentW*0.12,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.15]);
   drawKV([
     ['Hydric Soil Indicators', (s.HydricSoilIndicators || []).join(', ') || '—'],

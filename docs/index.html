@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0f1115" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -15,11 +15,14 @@
     <div class="brand">
       <img src="assets/fraxinus-logo.svg" alt="Fraxinus" class="brand-logo" />
       <div>
-        <h1>WETLANDS 1.1</h1>
-        <p>Fraxinus Wetland Control Plot Survey</p>
+        <h1>WETLANDS NTB</h1>
+        <p>Wetland Data Collection Tool</p>
       </div>
     </div>
-    <button id="btn-home" class="ghost">Dashboard</button>
+    <div class="header-actions">
+      <button id="btn-instructions" class="ghost icon-left"><i data-lucide="book-open-text"></i><span>Instructions</span></button>
+      <button id="btn-home" class="ghost icon-only" aria-label="Home"><i data-lucide="house"></i></button>
+    </div>
   </header>
 
   <main>
@@ -136,6 +139,20 @@
     </section>
   </main>
 
-  <script src="app.js?v=15"></script>
+  <dialog id="instructions-popover" class="instructions-popover">
+    <h3>Using WETLANDS NTB</h3>
+    <ul>
+      <li>Use <strong>Launch New Form</strong> to start, or <strong>Drafts Library</strong> to resume prior work.</li>
+      <li>The form autosaves while you type. Returning home prompts to save a resumable snapshot.</li>
+      <li>In soil horizons, enter Munsell codes (e.g., <code>10YR 4/3</code>) for Matrix/Redox fields.</li>
+      <li>Known Munsell codes show as <em>Code (Description)</em> and PDF exports include these descriptions.</li>
+      <li>Submit when complete, then manage exports in <strong>Submitted Forms</strong>.</li>
+    </ul>
+    <div class="actions">
+      <button id="btn-close-instructions" class="primary" type="button">Got it</button>
+    </div>
+  </dialog>
+
+  <script src="app.js?v=17"></script>
 </body>
 </html>
