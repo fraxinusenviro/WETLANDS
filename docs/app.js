@@ -1361,7 +1361,16 @@ async function exportRecordPdf(s, base) {
 
     let ry = y + headerH;
     rows.forEach((r) => {
-      doc.rect(x, ry, tableW, rowH);
+      const stratum = String(r?.[0] || '').toLowerCase();
+      if (opts.shadeByStratum) {
+        if (stratum === 'tree') doc.setFillColor(232, 245, 233);
+        else if (stratum === 'shrub') doc.setFillColor(243, 232, 245);
+        else if (stratum === 'herb') doc.setFillColor(232, 240, 252);
+        else doc.setFillColor(255, 255, 255);
+        doc.rect(x, ry, tableW, rowH, 'FD');
+      } else {
+        doc.rect(x, ry, tableW, rowH);
+      }
       let rx = x;
       r.forEach((cell, i) => {
         const text = String(cell ?? '—');
@@ -1399,7 +1408,30 @@ async function exportRecordPdf(s, base) {
     doc.setFontSize(8);
     doc.setTextColor(...colors.white);
     doc.text('SURVEY OVERVIEW', margin + 4, y + 9.5);
-    y += sectionH + 8;
+    y += sectionH + 6;
+
+    const wetlandLabel = (s.PLOT_TYPE || '').toLowerCase().includes('upland') ? 'UPLAND' : 'WETLAND';
+    const badges = [
+      `Wetland ID: ${s.WetlandID || '—'}`,
+      wetlandLabel
+    ];
+    let bx = margin;
+    badges.forEach((txt, idx) => {
+      const bw = Math.min(contentW * 0.55, Math.max(150, doc.getTextWidth(txt) + 22));
+      if (idx === 1) {
+        if (wetlandLabel === 'UPLAND') doc.setFillColor(98, 108, 124);
+        else doc.setFillColor(11, 107, 80);
+      } else {
+        doc.setFillColor(33, 33, 33);
+      }
+      doc.roundedRect(bx, y, bw, 18, 4, 4, 'F');
+      doc.setTextColor(...colors.white);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text(txt, bx + 8, y + 12);
+      bx += bw + 10;
+    });
+    y += 24;
 
     const startY = y;
     const leftX = margin;
@@ -1463,27 +1495,6 @@ async function exportRecordPdf(s, base) {
 
   drawTopPairTables('Survey Metadata', metadataRows, 'Summary Conditions', summaryRows);
 
-  // Summary badges
-  ensureSpace(26);
-  const wetlandBadge = (s.PLOT_TYPE || '').toLowerCase().includes('upland') ? 'UPLAND' : 'WETLAND';
-  const badges = [
-    `Wetland ID: ${s.WetlandID || '—'}`,
-    `Class: ${wetlandBadge}`
-  ];
-  let bx = margin;
-  badges.forEach((txt, idx) => {
-    const bw = Math.min(contentW * 0.48, Math.max(120, doc.getTextWidth(txt) + 14));
-    doc.setFillColor(11, 107, 80);
-    if (idx === 1 && wetlandBadge === 'UPLAND') doc.setFillColor(70, 70, 70);
-    doc.roundedRect(bx, y, bw, 14, 3, 3, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text(txt, bx + 6, y + 9.5);
-    bx += bw + 8;
-  });
-  y += 20;
-
   const disturbanceRows = ['DistSoilYN','DistVegYN','DistHydroYN','ProbSoilYN','ProbVegYN','ProbHydroYN','ClimHydroNormalYN','CircNormalYN']
     .map(k => [displayLabel(k), s[k] || '—']);
   drawTable('Disturbance & Problematic Conditions', ['Condition', 'Value'], disturbanceRows, [contentW * 0.66, contentW * 0.34], { showHeader: false, boldLeftColumn: true });
@@ -1498,7 +1509,7 @@ async function exportRecordPdf(s, base) {
     e.cover || '—',
     vegAuto.has(`${e.group}:${e.i}`) ? 'Y' : 'N'
   ]);
-  drawTable('Vegetation', ['Layer', 'Common Name', 'Scientific Name', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—','—']], [contentW * 0.10, contentW * 0.28, contentW * 0.30, contentW * 0.12, contentW * 0.14, contentW * 0.06], { italicCols: [2] });
+  drawTable('Vegetation', ['Layer', 'Common Name', 'Scientific Name', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—','—']], [contentW * 0.10, contentW * 0.28, contentW * 0.30, contentW * 0.12, contentW * 0.14, contentW * 0.06], { italicCols: [2], shadeByStratum: true });
 
   const vMetrics = vegetationMetricsFromSurvey(s);
   drawTable('Vegetation Indices', ['Metric', 'Value'], [
