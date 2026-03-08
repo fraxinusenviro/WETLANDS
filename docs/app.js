@@ -1482,15 +1482,15 @@ async function exportRecordPdf(s, base) {
     ['Dominance Test (A/B)', `${vMetrics.dominanceA}/${vMetrics.dominanceB} (${vMetrics.dominancePct.toFixed(1)}%)`],
     ['Dominance Pass (>50%)', vMetrics.dominancePass ? 'Yes' : 'No'],
     ['Prevalence Index (B/A)', vMetrics.prevalenceIndex.toFixed(2)],
-    ['Prevalence Pass (≤3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
+    ['Prevalence Pass (<=3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
   ], [contentW * 0.45, contentW * 0.55], { showHeader: false, boldLeftColumn: true });
 
   ensureSpace(44);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(...colors.muted);
-  const fp1 = 'Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): rank by absolute cover, include species cumulatively exceeding 50% of stratum cover, plus any additional species at ≥20% of stratum cover.';
-  const fp2 = 'Prevalence Index = (OBL×1 + FACW×2 + FAC×3 + FACU×4 + UPL×5) / total vegetative cover across those indicator classes.';
+  const fp1 = 'Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): rank by absolute cover, include species cumulatively exceeding 50% of stratum cover, plus any additional species at >=20% of stratum cover.';
+  const fp2 = 'Prevalence Index = (OBL*1 + FACW*2 + FAC*3 + FACU*4 + UPL*5) / total vegetative cover across those indicator classes.';
   const fp1Lines = doc.splitTextToSize(fp1, contentW);
   const fp2Lines = doc.splitTextToSize(fp2, contentW);
   doc.text(fp1Lines, margin, y + 7);
@@ -1733,15 +1733,15 @@ async function exportRecordPdfFormStyle(s, base) {
     ['Dominance Test (A/B)', `${vMetrics.dominanceA}/${vMetrics.dominanceB} (${vMetrics.dominancePct.toFixed(1)}%)`],
     ['Dominance Pass (>50%)', vMetrics.dominancePass ? 'Yes' : 'No'],
     ['Prevalence Index (B/A)', vMetrics.prevalenceIndex.toFixed(2)],
-    ['Prevalence Pass (≤3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
+    ['Prevalence Pass (<=3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
   ], 0.45);
 
   ensureSpace(44);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(71, 85, 105);
-  const fp1 = 'Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): include species cumulatively exceeding 50% of stratum cover, plus any additional species at ≥20% of stratum cover.';
-  const fp2 = 'Prevalence Index = (OBL×1 + FACW×2 + FAC×3 + FACU×4 + UPL×5) / total cover in those indicator classes.';
+  const fp1 = 'Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): include species cumulatively exceeding 50% of stratum cover, plus any additional species at >=20% of stratum cover.';
+  const fp2 = 'Prevalence Index = (OBL*1 + FACW*2 + FAC*3 + FACU*4 + UPL*5) / total cover in those indicator classes.';
   const fp1Lines = doc.splitTextToSize(fp1, contentW);
   const fp2Lines = doc.splitTextToSize(fp2, contentW);
   doc.text(fp1Lines, margin, y + 7);
