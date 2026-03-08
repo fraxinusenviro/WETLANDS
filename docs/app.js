@@ -1673,9 +1673,19 @@ let pdfLogoDataUrlCache = null;
 async function loadPdfLogoDataUrl() {
   if (pdfLogoDataUrlCache) return pdfLogoDataUrlCache;
   try {
-    const logoUrl = new URL('icon-192.png', window.location.href).href;
-    const res = await fetch(logoUrl);
-    const blob = await res.blob();
+    const logoCandidates = [
+      new URL('assets/fraxinus-logo.svg?v=2', window.location.href).href,
+      new URL('icon-192.png', window.location.href).href
+    ];
+    let blob = null;
+    for (const logoUrl of logoCandidates) {
+      try {
+        const res = await fetch(logoUrl);
+        if (res.ok) { blob = await res.blob(); break; }
+      } catch {}
+    }
+    if (!blob) return '';
+
     const dataUrl = await new Promise((resolve, reject) => {
       const fr = new FileReader();
       fr.onload = () => resolve(fr.result);
@@ -2015,6 +2025,11 @@ async function exportRecordPdf(s, base) {
   doc.rect(margin, y, contentW, topHeaderH, 'FD');
 
   const xAt = (idx) => margin + soilsW.slice(0, idx).reduce((a,b)=>a+b,0);
+  doc.setFillColor(224, 237, 255);
+  doc.rect(xAt(4), y, soilsW[4] + soilsW[5], topHeaderH, 'F');
+  doc.setFillColor(236, 228, 252);
+  doc.rect(xAt(6), y, soilsW[6] + soilsW[7] + soilsW[8] + soilsW[9], topHeaderH, 'F');
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.2);
   doc.setTextColor(...colors.ink);
@@ -2347,6 +2362,11 @@ async function exportRecordPdfFormStyle(s, base) {
   doc.rect(margin, y, contentW, topHeaderH2, 'FD');
 
   const xAt2 = (idx) => margin + soilsW2.slice(0, idx).reduce((a,b)=>a+b,0);
+  doc.setFillColor(224, 237, 255);
+  doc.rect(xAt2(4), y, soilsW2[4] + soilsW2[5], topHeaderH2, 'F');
+  doc.setFillColor(236, 228, 252);
+  doc.rect(xAt2(6), y, soilsW2[6] + soilsW2[7] + soilsW2[8] + soilsW2[9], topHeaderH2, 'F');
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.2);
   doc.setTextColor(15, 23, 42);
