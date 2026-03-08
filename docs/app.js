@@ -1055,16 +1055,26 @@ function speciesRows(s, group, n) {
   return rows.length ? rows : [['—', '—']];
 }
 
-function soilRows(s, includeMunsellDescriptions = false) {
+function munsellDisplayMultiline(input) {
+  const code = normalizeMunsellCode(input).replace(/\s*(\([^)]*\)|\[[^\]]*\])\s*$/, '');
+  const desc = munsellDescriptionFor(code);
+  return desc ? `${code}\n[${desc}]` : code;
+}
+
+function soilRows(s, includeMunsellDescriptions = false, multilineMunsellDescription = false) {
   const rows = [];
   for (let h = 1; h <= 4; h++) {
     const thick = s[`SoilH${h}ThickCM`];
     const texture = s[`SoilH${h}Texture`];
     const matrixRaw = s[`SoilH${h}Matrix`];
-    const matrix = includeMunsellDescriptions ? munsellDisplay(matrixRaw) : (matrixRaw || '—');
+    const matrix = includeMunsellDescriptions
+      ? (multilineMunsellDescription ? munsellDisplayMultiline(matrixRaw) : munsellDisplay(matrixRaw))
+      : (matrixRaw || '—');
     const matrixPC = s[`SoilH${h}MatrixPC`];
     const redoxRaw = s[`SoilH${h}Redox`];
-    const redox = includeMunsellDescriptions ? munsellDisplay(redoxRaw) : (redoxRaw || '—');
+    const redox = includeMunsellDescriptions
+      ? (multilineMunsellDescription ? munsellDisplayMultiline(redoxRaw) : munsellDisplay(redoxRaw))
+      : (redoxRaw || '—');
     const redoxPC = s[`SoilH${h}RedoxPC`];
     const redoxType = s[`SoilH${h}RedoxType`];
     const redoxLoc = s[`SoilH${h}RedoxLoc`];
@@ -1535,7 +1545,8 @@ async function exportRecordPdf(s, base) {
     rows.forEach((r) => {
       const wrapped = r.map((cell, i) => {
         const text = String(cell ?? '—');
-        const lines = opts.wrapCells ? doc.splitTextToSize(text, colW[i] - 6) : [doc.splitTextToSize(text, colW[i] - 6)[0] || '—'];
+        const splitByLine = text.split(/\n/g).flatMap(part => doc.splitTextToSize(part, colW[i] - 6));
+        const lines = opts.wrapCells ? splitByLine : [splitByLine[0] || '—'];
         return lines.length ? lines : ['—'];
       });
       const rowH = Math.max(baseRowH, ...wrapped.map(lines => (lines.length * (fontSize + 1)) + 4));
@@ -1725,9 +1736,9 @@ async function exportRecordPdf(s, base) {
   newPage();
   drawHeader();
 
-  const soilsRows = soilRows(s, true);
-  drawTable('Hydric Soils', ['Hor','Thk','Texture','Matrix','M%','Redox','R%','Type','Loc'], soilsRows,
-    [contentW*0.06,contentW*0.08,contentW*0.10,contentW*0.22,contentW*0.06,contentW*0.22,contentW*0.06,contentW*0.10,contentW*0.10],
+  const soilsRows = soilRows(s, true, true);
+  drawTable('Hydric Soils', ['Horizon','Thickness (cm)','Texture','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilsRows,
+    [contentW*0.07,contentW*0.11,contentW*0.10,contentW*0.19,contentW*0.07,contentW*0.19,contentW*0.07,contentW*0.10,contentW*0.10],
     { wrapCells: true });
 
   const hydroRows = [
@@ -1884,7 +1895,9 @@ async function exportRecordPdfFormStyle(s, base) {
     y += headerH;
     rows.forEach((r) => {
       const wrapped = r.map((cell, i) => {
-        const lines = opts.wrapCells ? doc.splitTextToSize(String(cell ?? '—'), widths[i] - 6) : [doc.splitTextToSize(String(cell ?? '—'), widths[i] - 6)[0] || '—'];
+        const text = String(cell ?? '—');
+        const splitByLine = text.split(/\n/g).flatMap(part => doc.splitTextToSize(part, widths[i] - 6));
+        const lines = opts.wrapCells ? splitByLine : [splitByLine[0] || '—'];
         return lines.length ? lines : ['—'];
       });
       const rowH = Math.max(baseRowH, ...wrapped.map(lines => (lines.length * 9) + 4));
@@ -1988,8 +2001,8 @@ async function exportRecordPdfFormStyle(s, base) {
   y += fp2Lines.length * 7 + 5;
 
   sectionBar('Soils');
-  drawTable(['Hor', 'Thk (cm)', 'Texture', 'Matrix', 'M%', 'Redox', 'R%', 'Type', 'Loc'], soilRows(s, true),
-    [contentW*0.06,contentW*0.09,contentW*0.10,contentW*0.22,contentW*0.06,contentW*0.22,contentW*0.06,contentW*0.10,contentW*0.09],
+  drawTable(['Horizon', 'Thickness (cm)', 'Texture', 'Matrix Color', 'Matrix %', 'Redox Color', 'Redox %', 'Redox Type', 'Redox Location'], soilRows(s, true, true),
+    [contentW*0.07,contentW*0.11,contentW*0.10,contentW*0.19,contentW*0.07,contentW*0.19,contentW*0.07,contentW*0.10,contentW*0.10],
     { wrapCells: true });
   drawKV([
     ['Hydric Soil Indicators', (s.HydricSoilIndicators || []).join(', ') || '—'],
