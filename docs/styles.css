@@ -67,22 +67,26 @@ h2 { margin-top: .35rem; font-size: 2rem; letter-spacing: .2px; }
   background: linear-gradient(160deg, var(--panel), var(--panel-2));
   box-shadow: var(--shadow);
   transition: transform .12s ease, border-color .2s ease;
+  display: flex;
+  align-items: center;
+  gap: .85rem;
 }
 .launch-card:hover { transform: translateY(-1px); border-color: #35517a; }
-.launch-card strong { font-size: 1.05rem; }
-.launch-card span { color: #d7e4fb; display:block; margin-top:.25rem; }
+.launch-copy { display: block; }
+.launch-copy strong { font-size: 1.1rem; display: block; line-height: 1.2; }
+.launch-copy span { color: #d7e4fb; display:block; margin-top:.25rem; }
 .launch-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: .55rem;
-  margin-bottom: .45rem;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.18);
+  width: 3rem;
+  height: 3rem;
+  min-width: 3rem;
+  border-radius: .75rem;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.28);
 }
-.launch-icon svg { width: 1rem; height: 1rem; }
+.launch-icon svg { width: 1.6rem; height: 1.6rem; stroke-width: 2.4; }
 .launch-primary { background: linear-gradient(160deg, #143053, #173c65); border-color: #29598c; }
 .launch-submissions { background: linear-gradient(160deg, #173348, #194e5d); border-color: #2b6c7f; }
 .launch-drafts { background: linear-gradient(160deg, #2d2447, #402f66); border-color: #6345a5; }
