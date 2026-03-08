@@ -538,6 +538,14 @@ function extractScientificName(text) {
   return raw.trim() || '—';
 }
 
+function extractCommonName(text) {
+  const raw = String(text || '');
+  const noCode = raw.replace(/^[^-]+-\s*/, '');
+  const m = noCode.match(/^(.*?)\s*\(([^)]+)\)\s*-\s*[A-Za-z0-9+\-?]+\s*$/);
+  if (m && m[1]) return m[1].trim();
+  return noCode.trim() || '—';
+}
+
 function searchPlantReference(q) {
   const query = String(q || '').trim().toLowerCase();
   if (!query) return plantReferenceRecords.slice(0, 100);
@@ -1461,12 +1469,13 @@ async function exportRecordPdf(s, base) {
   const vegAuto = autoDominantSet(vegEntries);
   const vegRows = vegEntries.map(e => [
     e.group,
+    extractCommonName(e.species || '—'),
     extractScientificName(e.species || '—'),
     e.status || '—',
     e.cover || '—',
     vegAuto.has(`${e.group}:${e.i}`) ? 'Y' : 'N'
   ]);
-  drawTable('Vegetation', ['Layer', 'Scientific Name', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—']], [contentW * 0.12, contentW * 0.48, contentW * 0.14, contentW * 0.16, contentW * 0.10], { italicCols: [1] });
+  drawTable('Vegetation', ['Layer', 'Common Name', 'Scientific Name', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—','—']], [contentW * 0.10, contentW * 0.28, contentW * 0.30, contentW * 0.12, contentW * 0.14, contentW * 0.06], { italicCols: [2] });
 
   const vMetrics = vegetationMetricsFromSurvey(s);
   drawTable('Vegetation Indices', ['Metric', 'Value'], [
@@ -1476,16 +1485,18 @@ async function exportRecordPdf(s, base) {
     ['Prevalence Pass (≤3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
   ], [contentW * 0.45, contentW * 0.55], { showHeader: false, boldLeftColumn: true });
 
-  ensureSpace(28);
+  ensureSpace(44);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setTextColor(...colors.muted);
-  const fp1 = 'Fine print: Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): rank by absolute cover, include species cumulatively exceeding 50% of stratum cover, plus any additional species at ≥20% of stratum cover.';
-  const fp2 = 'Prevalence Index = (OBL×1 + FACW×2 + FAC×3 + FACU×4 + UPL×5) / (total vegetative cover across those indicator classes). Lower values indicate greater hydrophytic affinity.';
-  doc.text(doc.splitTextToSize(fp1, contentW), margin, y + 8);
-  y += 14;
-  doc.text(doc.splitTextToSize(fp2, contentW), margin, y + 8);
-  y += 18;
+  const fp1 = 'Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): rank by absolute cover, include species cumulatively exceeding 50% of stratum cover, plus any additional species at ≥20% of stratum cover.';
+  const fp2 = 'Prevalence Index = (OBL×1 + FACW×2 + FAC×3 + FACU×4 + UPL×5) / total vegetative cover across those indicator classes.';
+  const fp1Lines = doc.splitTextToSize(fp1, contentW);
+  const fp2Lines = doc.splitTextToSize(fp2, contentW);
+  doc.text(fp1Lines, margin, y + 7);
+  y += fp1Lines.length * 7 + 3;
+  doc.text(fp2Lines, margin, y + 7);
+  y += fp2Lines.length * 7 + 5;
 
   const soilsRows = soilRows(s);
   drawTable('Hydric Soils', ['Hor','Thk','Texture','Matrix','M%','Redox','R%','Type','Loc'], soilsRows,
@@ -1713,9 +1724,9 @@ async function exportRecordPdfFormStyle(s, base) {
 
   const vegEntries = vegetationEntriesFromSurvey(s);
   const vegAuto = autoDominantSet(vegEntries);
-  const vegRows = vegEntries.map(e => [e.group, extractScientificName(e.species || '—'), e.status || '—', e.cover || '—', vegAuto.has(`${e.group}:${e.i}`) ? 'Y' : 'N']);
+  const vegRows = vegEntries.map(e => [e.group, extractCommonName(e.species || '—'), extractScientificName(e.species || '—'), e.status || '—', e.cover || '—', vegAuto.has(`${e.group}:${e.i}`) ? 'Y' : 'N']);
   sectionBar('Vegetation');
-  drawTable(['Stratum', 'Scientific Name', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—'],], [contentW * 0.14, contentW * 0.46, contentW * 0.14, contentW * 0.16, contentW * 0.10], { italicCols: [1] });
+  drawTable(['Stratum', 'Common Name', 'Scientific Name', 'Status', '% Cover', 'Dom'], vegRows.length ? vegRows : [['—','—','—','—','—','—'],], [contentW * 0.12, contentW * 0.26, contentW * 0.30, contentW * 0.12, contentW * 0.14, contentW * 0.06], { italicCols: [2] });
 
   const vMetrics = vegetationMetricsFromSurvey(s);
   drawKV([
@@ -1725,16 +1736,18 @@ async function exportRecordPdfFormStyle(s, base) {
     ['Prevalence Pass (≤3.0)', vMetrics.prevalencePass ? 'Yes' : 'No']
   ], 0.45);
 
-  ensureSpace(28);
+  ensureSpace(44);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setTextColor(71, 85, 105);
-  const fp1 = 'Fine print: Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): include species cumulatively exceeding 50% of stratum cover, plus any additional species at ≥20% of stratum cover.';
+  const fp1 = 'Dominance Test uses the 50/20 rule by stratum (Tree/Shrub/Herb): include species cumulatively exceeding 50% of stratum cover, plus any additional species at ≥20% of stratum cover.';
   const fp2 = 'Prevalence Index = (OBL×1 + FACW×2 + FAC×3 + FACU×4 + UPL×5) / total cover in those indicator classes.';
-  doc.text(doc.splitTextToSize(fp1, contentW), margin, y + 8);
-  y += 14;
-  doc.text(doc.splitTextToSize(fp2, contentW), margin, y + 8);
-  y += 18;
+  const fp1Lines = doc.splitTextToSize(fp1, contentW);
+  const fp2Lines = doc.splitTextToSize(fp2, contentW);
+  doc.text(fp1Lines, margin, y + 7);
+  y += fp1Lines.length * 7 + 3;
+  doc.text(fp2Lines, margin, y + 7);
+  y += fp2Lines.length * 7 + 5;
 
   sectionBar('Soils');
   drawTable(['Hor', 'Thk (cm)', 'Texture', 'Matrix', 'M%', 'Redox', 'R%', 'Type', 'Loc'], soilRows(s),
