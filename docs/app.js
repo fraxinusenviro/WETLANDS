@@ -1674,7 +1674,7 @@ async function loadPdfLogoDataUrl() {
   if (pdfLogoDataUrlCache) return pdfLogoDataUrlCache;
   try {
     const logoCandidates = [
-      new URL('assets/fraxinus-logo.svg?v=2', window.location.href).href,
+      new URL('assets/fraxinus-logo.svg?v=3', window.location.href).href,
       new URL('icon-192.png', window.location.href).href
     ];
     let blob = null;
