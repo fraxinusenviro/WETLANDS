@@ -1,7 +1,7 @@
 const yesNo = ["", "Yes", "No"];
 const observers = ["", "IB", "ZS", "SD", "CN", "Other"];
 const provinces = ["", "NS", "PEI", "NB", "NL"];
-const plotTypes = ["", "Control", "Test", "Reference", "Other"];
+const plotTypes = ["", "Wetland Control Plot", "Upland Control Plot"];
 const pageOrder = ["metadata", "vegetation", "hydrology", "soils"];
 
 const hydricSoilIndicators = ["Histosol (A1)","Histic Epipedon (A2)","Black Histic (A3)","Hydrogen Sulfide (A4)","Stratified Layers (A5)","Depleted Below Dark Surface (A11)","Thick Dark Surface (A12)","Sandy Mucky Mineral (S1)","Sandy Gleyed Matrix (S4)","Sandy Redox (S5)","Polyvalue Below Surface (S8)","Thin Dark Surface (S9)","Loamy Gleyed Matrix (F2)","Depleted Matrix (F3)","Redox Dark Surface (F6)","Depleted Dark Surface (F7)","Redox Depressions (F8)"];
@@ -10,7 +10,7 @@ const wetlandHydrologySecondary = ["Surface Soil Cracks (B6)","Drainage Patterns
 
 const metadataFields = [
   ["SiteID", "text"], ["LocaleName", "text"], ["Province", "select", provinces], ["date", "date"], ["time", "time"], ["observer", "select", observers],
-  ["PLOT_ID", "text"], ["PLOT_TYPE", "select", plotTypes], ["latitude", "number"], ["longitude", "number"],
+  ["PLOT_ID", "text"], ["WetlandID", "text"], ["PLOT_TYPE", "select", plotTypes], ["latitude", "number"], ["longitude", "number"],
   ["DistSoilYN", "select", yesNo], ["DistVegYN", "select", yesNo], ["DistHydroYN", "select", yesNo], ["ProbSoilYN", "select", yesNo], ["ProbVegYN", "select", yesNo], ["ProbHydroYN", "select", yesNo],
   ["ClimHydroNormalYN", "select", yesNo], ["CircNormalYN", "select", yesNo], ["SummaryHydroVegYN", "select", yesNo], ["SummaryHydricSoilYN", "select", yesNo], ["SummaryHydrologyYN", "select", yesNo], ["SummaryInWetlandYN", "select", yesNo]
 ];
@@ -63,7 +63,7 @@ async function init() {
 
 function defaultSurvey() {
   const now = new Date();
-  const obj = { id: makeId(), timestamp: new Date().toISOString(), SiteID:"", LocaleName:"", Province:"", date: now.toISOString().slice(0,10), time: now.toTimeString().slice(0,5), observer:"", PLOT_ID:"", PLOT_TYPE:"", latitude:"", longitude:"", DistSoilYN:"", DistVegYN:"", DistHydroYN:"", ProbSoilYN:"", ProbVegYN:"", ProbHydroYN:"", ClimHydroNormalYN:"", CircNormalYN:"", SummaryHydroVegYN:"", SummaryHydricSoilYN:"", SummaryHydrologyYN:"", SummaryInWetlandYN:"", notes:"", RestrictiveLayer:"", RestrictiveLayerDepthCM:"", SurfaceWaterYN:"", SurfaceWaterDepthCM:"", WaterTableYN:"", WaterTableDepthCM:"", SaturationYN:"", SaturationDepthCM:"", HydricSoilIndicators:[], HydrologyPrimary:[], HydrologySecondary:[], photos:[] };
+  const obj = { id: makeId(), timestamp: new Date().toISOString(), SiteID:"", LocaleName:"", Province:"", date: now.toISOString().slice(0,10), time: now.toTimeString().slice(0,5), observer:"", PLOT_ID:"", WetlandID:"", PLOT_TYPE:"", latitude:"", longitude:"", DistSoilYN:"", DistVegYN:"", DistHydroYN:"", ProbSoilYN:"", ProbVegYN:"", ProbHydroYN:"", ClimHydroNormalYN:"", CircNormalYN:"", SummaryHydroVegYN:"", SummaryHydricSoilYN:"", SummaryHydrologyYN:"", SummaryInWetlandYN:"", notes:"", RestrictiveLayer:"", RestrictiveLayerDepthCM:"", SurfaceWaterYN:"", SurfaceWaterDepthCM:"", WaterTableYN:"", WaterTableDepthCM:"", SaturationYN:"", SaturationDepthCM:"", HydricSoilIndicators:[], HydrologyPrimary:[], HydrologySecondary:[], photos:[] };
   ["Tree","Shrub"].forEach(g => { for (let i=1;i<=6;i++) { obj[`${g}Sp${i}`]=""; obj[`${g}Sp${i}Cov`]=""; obj[`${g}Sp${i}Status`]=""; obj[`${g}Sp${i}Dom`]=false; } });
   for (let i=1;i<=10;i++) { obj[`HerbSp${i}`]=""; obj[`HerbSp${i}Cov`]=""; obj[`HerbSp${i}Status`]=""; obj[`HerbSp${i}Dom`]=false; }
   for (let h=1;h<=4;h++) ["ThickCM","Texture","Matrix","MatrixPC","Redox","RedoxPC","RedoxType","RedoxLoc"].forEach(s => obj[`SoilH${h}${s}`]="");
@@ -712,7 +712,7 @@ function displayLabel(key) {
     return `Soil Horizon ${h[1]} ${map[h[2]]}`;
   }
   const fixed = {
-    SiteID: 'Site ID', LocaleName: 'Locale', PLOT_ID: 'Plot ID', PLOT_TYPE: 'Plot Type',
+    SiteID: 'Site ID', LocaleName: 'Locale', PLOT_ID: 'Plot ID', WetlandID: 'Wetland ID', PLOT_TYPE: 'Plot Type',
     DistSoilYN: 'Disturbed Soils?', DistVegYN: 'Disturbed Vegetation?', DistHydroYN: 'Disturbed Hydrology?',
     ProbSoilYN: 'Problematic Soils?', ProbVegYN: 'Problematic Vegetation?', ProbHydroYN: 'Problematic Hydrology?',
     ClimHydroNormalYN: 'Normal Climatic Conditions?', CircNormalYN: 'Normal Circumstances Present?',
@@ -1004,7 +1004,7 @@ function recordMarkdown(s) {
     `## 1. Survey Metadata`
   ];
 
-  ['SiteID','LocaleName','observer','latitude','longitude','Province','date','time','PLOT_TYPE'].forEach(k => {
+  ['SiteID','LocaleName','observer','latitude','longitude','Province','date','time','PLOT_TYPE','WetlandID'].forEach(k => {
     lines.push(`- **${displayLabel(k)}:** ${s[k] || '—'}`);
   });
 
@@ -1038,6 +1038,7 @@ function recordHTML(s) {
   const metadataRows = [
     ['Site Name', val('SiteID')],
     ['Plot ID', val('PLOT_ID')],
+    ['Wetland ID', val('WetlandID')],
     ['Surveyor', val('observer')],
     ['Locale', val('LocaleName')],
     ['Province', val('Province')],
@@ -1049,10 +1050,10 @@ function recordHTML(s) {
   ];
 
   const summaryItems = [
-    ['Hydrophytic Vegetation', yesNo('SummaryHydroVegYN')],
-    ['Wetland Hydrology', yesNo('SummaryHydrologyYN')],
-    ['Hydric Soil', yesNo('SummaryHydricSoilYN')],
-    ['Point in Wetland', yesNo('SummaryInWetlandYN')]
+    ['Hydrophytic Vegetation?', yesNo('SummaryHydroVegYN')],
+    ['Wetland Hydrology?', yesNo('SummaryHydrologyYN')],
+    ['Hydric Soil?', yesNo('SummaryHydricSoilYN')],
+    ['Point in Wetland?', yesNo('SummaryInWetlandYN')]
   ];
 
   const vegRows = [
@@ -1442,6 +1443,7 @@ async function exportRecordPdf(s, base) {
   const metadataRows = [
     ['Site Name', s.SiteID || '—'],
     ['Plot ID', s.PLOT_ID || '—'],
+    ['Wetland ID', s.WetlandID || '—'],
     ['Surveyor', s.observer || '—'],
     ['Locale', s.LocaleName || '—'],
     ['Province', s.Province || '—'],
@@ -1453,13 +1455,34 @@ async function exportRecordPdf(s, base) {
   ];
 
   const summaryRows = [
-    ['Hydrophytic Vegetation', s.SummaryHydroVegYN || '—'],
-    ['Wetland Hydrology', s.SummaryHydrologyYN || '—'],
-    ['Hydric Soil', s.SummaryHydricSoilYN || '—'],
-    ['Point in Wetland', s.SummaryInWetlandYN || '—']
+    ['Hydrophytic Vegetation?', s.SummaryHydroVegYN || '—'],
+    ['Wetland Hydrology?', s.SummaryHydrologyYN || '—'],
+    ['Hydric Soil?', s.SummaryHydricSoilYN || '—'],
+    ['Point in Wetland?', s.SummaryInWetlandYN || '—']
   ];
 
   drawTopPairTables('Survey Metadata', metadataRows, 'Summary Conditions', summaryRows);
+
+  // Summary badges
+  ensureSpace(26);
+  const wetlandBadge = (s.PLOT_TYPE || '').toLowerCase().includes('upland') ? 'UPLAND' : 'WETLAND';
+  const badges = [
+    `Wetland ID: ${s.WetlandID || '—'}`,
+    `Class: ${wetlandBadge}`
+  ];
+  let bx = margin;
+  badges.forEach((txt, idx) => {
+    const bw = Math.min(contentW * 0.48, Math.max(120, doc.getTextWidth(txt) + 14));
+    doc.setFillColor(11, 107, 80);
+    if (idx === 1 && wetlandBadge === 'UPLAND') doc.setFillColor(70, 70, 70);
+    doc.roundedRect(bx, y, bw, 14, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(txt, bx + 6, y + 9.5);
+    bx += bw + 8;
+  });
+  y += 20;
 
   const disturbanceRows = ['DistSoilYN','DistVegYN','DistHydroYN','ProbSoilYN','ProbVegYN','ProbHydroYN','ClimHydroNormalYN','CircNormalYN']
     .map(k => [displayLabel(k), s[k] || '—']);
@@ -1497,6 +1520,10 @@ async function exportRecordPdf(s, base) {
   y += fp1Lines.length * 7 + 3;
   doc.text(fp2Lines, margin, y + 7);
   y += fp2Lines.length * 7 + 5;
+
+  // Force page 2 start for soils/hydrology/remarks
+  newPage();
+  drawHeader();
 
   const soilsRows = soilRows(s);
   drawTable('Hydric Soils', ['Hor','Thk','Texture','Matrix','M%','Redox','R%','Type','Loc'], soilsRows,
