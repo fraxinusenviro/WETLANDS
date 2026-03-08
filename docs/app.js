@@ -78,7 +78,7 @@ function defaultSurvey() {
   const obj = { id: makeId(), timestamp: new Date().toISOString(), SiteID:"", LocaleName:"", Province:"", date: now.toISOString().slice(0,10), time: now.toTimeString().slice(0,5), observer:"", PLOT_ID:"", WetlandID:"", PLOT_TYPE:"", latitude:"", longitude:"", LocalRelief:"", PercentSlope:"", Landform:"", DistSoilYN:"", DistVegYN:"", DistHydroYN:"", ProbSoilYN:"", ProbVegYN:"", ProbHydroYN:"", ClimHydroNormalYN:"", CircNormalYN:"", SummaryHydroVegYN:"", SummaryHydricSoilYN:"", SummaryHydrologyYN:"", SummaryInWetlandYN:"", notes:"", RestrictiveLayer:"", RestrictiveLayerDepthCM:"", SurfaceWaterYN:"", SurfaceWaterDepthCM:"", WaterTableYN:"", WaterTableDepthCM:"", SaturationYN:"", SaturationDepthCM:"", HydricSoilIndicators:[], HydrologyPrimary:[], HydrologySecondary:[], photos:[] };
   ["Tree","Shrub"].forEach(g => { for (let i=1;i<=6;i++) { obj[`${g}Sp${i}`]=""; obj[`${g}Sp${i}Cov`]=""; obj[`${g}Sp${i}Status`]=""; obj[`${g}Sp${i}Dom`]=false; } });
   for (let i=1;i<=10;i++) { obj[`HerbSp${i}`]=""; obj[`HerbSp${i}Cov`]=""; obj[`HerbSp${i}Status`]=""; obj[`HerbSp${i}Dom`]=false; }
-  for (let h=1;h<=4;h++) ["StartDepthCM","EndDepthCM","ThickCM","Texture","Matrix","MatrixPC","Redox","RedoxPC","RedoxType","RedoxLoc"].forEach(s => obj[`SoilH${h}${s}`]="");
+  for (let h=1;h<=4;h++) ["RestrictiveYN","StartDepthCM","EndDepthCM","ThickCM","Texture","Matrix","MatrixPC","Redox","RedoxPC","RedoxType","RedoxLoc"].forEach(s => obj[`SoilH${h}${s}`]="");
   return obj;
 }
 
@@ -283,6 +283,10 @@ function renderHydrology() {
   root.appendChild(checkGroup('HydrologySecondary', wetlandHydrologySecondary));
 }
 
+function isRestrictiveHorizon(h) {
+  return String(state[`SoilH${h}RestrictiveYN`] || '').toLowerCase() === 'yes';
+}
+
 function recomputeHorizonThickness(h) {
   const start = Number(state[`SoilH${h}StartDepthCM`]);
   const end = Number(state[`SoilH${h}EndDepthCM`]);
@@ -291,6 +295,36 @@ function recomputeHorizonThickness(h) {
     state[`SoilH${h}ThickCM`] = Number.isFinite(diff) ? String(Math.max(0, +diff.toFixed(2))) : '';
   } else {
     state[`SoilH${h}ThickCM`] = '';
+  }
+}
+
+function syncHorizonDepthLinks() {
+  let stop = false;
+  for (let h = 1; h <= soilUi.horizonCount; h++) {
+    if (stop) {
+      state[`SoilH${h}StartDepthCM`] = '';
+      state[`SoilH${h}EndDepthCM`] = '';
+      state[`SoilH${h}ThickCM`] = '';
+      continue;
+    }
+
+    if (h > 1) {
+      const prevRestrictive = isRestrictiveHorizon(h - 1);
+      if (prevRestrictive) {
+        state[`SoilH${h}StartDepthCM`] = '';
+        state[`SoilH${h}EndDepthCM`] = '';
+        state[`SoilH${h}ThickCM`] = '';
+        stop = true;
+        continue;
+      }
+
+      const start = Number(state[`SoilH${h}StartDepthCM`]);
+      if (Number.isFinite(start)) state[`SoilH${h - 1}EndDepthCM`] = String(start);
+    }
+
+    recomputeHorizonThickness(h);
+
+    if (isRestrictiveHorizon(h)) stop = true;
   }
 }
 
@@ -312,21 +346,27 @@ function renderSoils() {
   `;
   root.appendChild(top);
 
+  syncHorizonDepthLinks();
   for (let h = 1; h <= soilUi.horizonCount; h++) {
-    recomputeHorizonThickness(h);
     const card = document.createElement('div');
     card.className = 'card';
 
     const collapsed = soilUi.horizons[h]?.collapsed;
     const head = document.createElement('div');
     head.className = 'veg-head';
+    const restrictiveChecked = isRestrictiveHorizon(h) ? 'checked' : '';
     head.innerHTML = `
       <h3 class='group-title'>Soil Horizon ${h}</h3>
       <div class='veg-controls'>
+        <label style='display:flex;align-items:center;gap:.3rem;font-size:.8rem;color:var(--muted);'>
+          <input type='checkbox' data-restrictive='${h}' ${restrictiveChecked} /> Restrictive layer / pit end
+        </label>
         <button class='chevron' data-soil-collapse='${h}' aria-label='Toggle Soil Horizon ${h}'>${collapsed ? '▸' : '▾'}</button>
       </div>
     `;
     card.appendChild(head);
+
+    const priorRestrictive = h > 1 && Array.from({ length: h - 1 }, (_, i) => isRestrictiveHorizon(i + 1)).includes(true);
 
     if (!collapsed) {
       const table = document.createElement('div');
@@ -396,7 +436,7 @@ function renderSoils() {
             input.oninput = () => {
               state[key] = input.value;
               const m = key.match(/^SoilH(\d+)(StartDepthCM|EndDepthCM)$/);
-              if (m) recomputeHorizonThickness(Number(m[1]));
+              if (m) syncHorizonDepthLinks();
               queueAutosave();
             };
             input.onblur = () => {
@@ -408,12 +448,16 @@ function renderSoils() {
               }
               const m = key.match(/^SoilH(\d+)(StartDepthCM|EndDepthCM)$/);
               if (m) {
-                recomputeHorizonThickness(Number(m[1]));
+                syncHorizonDepthLinks();
                 renderSoils();
               }
             };
           }
 
+          if (priorRestrictive) {
+            input.disabled = true;
+            input.title = 'Disabled because a restrictive layer was marked in an earlier horizon.';
+          }
           cell.appendChild(input);
           return cell;
         };
@@ -452,6 +496,13 @@ function renderSoils() {
   root.querySelectorAll('button[data-soil-collapse]').forEach(btn => btn.addEventListener('click', () => {
     const h = Number(btn.dataset.soilCollapse);
     soilUi.horizons[h].collapsed = !soilUi.horizons[h].collapsed;
+    renderSoils();
+  }));
+  root.querySelectorAll('input[data-restrictive]').forEach(inp => inp.addEventListener('change', () => {
+    const h = Number(inp.dataset.restrictive);
+    state[`SoilH${h}RestrictiveYN`] = inp.checked ? 'Yes' : 'No';
+    syncHorizonDepthLinks();
+    queueAutosave(true);
     renderSoils();
   }));
 }
@@ -899,7 +950,8 @@ function horizonRows() {
     const texture = state[`SoilH${h}Texture`] || '';
     const matrix = parseMunsellCode(state[`SoilH${h}Matrix`]);
     const redoxType = String(state[`SoilH${h}RedoxType`] || '');
-    rows.push({ h, start, end, thick, matrixPC, redoxPC, texture, matrix, redoxType });
+    const restrictive = isRestrictiveHorizon(h);
+    rows.push({ h, start, end, thick, matrixPC, redoxPC, texture, matrix, redoxType, restrictive });
   }
   return rows;
 }
@@ -907,16 +959,20 @@ function horizonRows() {
 function computeHorizonValidationIssues() {
   const issues = [];
   const rows = horizonRows();
+  let stop = false;
   rows.forEach(r => {
+    if (stop) return;
     if (Number.isFinite(r.start) && Number.isFinite(r.end) && r.end < r.start) {
       issues.push(`H${r.h}: End depth is less than start depth.`);
     }
     if (!Number.isFinite(r.start) || !Number.isFinite(r.end)) {
       issues.push(`H${r.h}: Start and end depth should both be entered.`);
     }
+    if (r.restrictive) stop = true;
   });
   for (let i = 0; i < rows.length - 1; i++) {
     const a = rows[i], b = rows[i + 1];
+    if (a.restrictive) break;
     if (Number.isFinite(a.end) && Number.isFinite(b.start)) {
       if (b.start > a.end) issues.push(`Gap between H${a.h} and H${b.h} (${a.end}–${b.start} cm).`);
       if (b.start < a.end) issues.push(`Overlap between H${a.h} and H${b.h} (${b.start} < ${a.end} cm).`);
@@ -1042,9 +1098,9 @@ function displayLabel(key) {
     const suffix = m[3] === 'Cov' ? ' % Cover' : m[3] === 'Status' ? ' Indicator Status' : m[3] === 'Dom' ? ' Dominant?' : '';
     return `${m[1]} Species #${m[2]}${suffix}`;
   }
-  const h = key.match(/^SoilH(\d+)(StartDepthCM|EndDepthCM|ThickCM|Texture|Matrix|MatrixPC|Redox|RedoxPC|RedoxType|RedoxLoc)$/);
+  const h = key.match(/^SoilH(\d+)(RestrictiveYN|StartDepthCM|EndDepthCM|ThickCM|Texture|Matrix|MatrixPC|Redox|RedoxPC|RedoxType|RedoxLoc)$/);
   if (h) {
-    const map = { StartDepthCM: 'Start Depth (cm)', EndDepthCM: 'End Depth (cm)', ThickCM: 'Thickness (cm)', Texture: 'Texture', Matrix: 'Matrix Color', MatrixPC: 'Matrix %', Redox: 'Redox Color', RedoxPC: 'Redox %', RedoxType: 'Redox Type', RedoxLoc: 'Redox Location' };
+    const map = { RestrictiveYN: 'Restrictive Layer / Pit End?', StartDepthCM: 'Start Depth (cm)', EndDepthCM: 'End Depth (cm)', ThickCM: 'Thickness (cm)', Texture: 'Texture', Matrix: 'Matrix Color', MatrixPC: 'Matrix %', Redox: 'Redox Color', RedoxPC: 'Redox %', RedoxType: 'Redox Type', RedoxLoc: 'Redox Location' };
     return `Soil Horizon ${h[1]} ${map[h[2]]}`;
   }
   const fixed = {
@@ -1259,11 +1315,12 @@ function soilRows(s, includeMunsellDescriptions = false, multilineMunsellDescrip
     const redoxPC = s[`SoilH${h}RedoxPC`];
     const redoxType = s[`SoilH${h}RedoxType`];
     const redoxLoc = s[`SoilH${h}RedoxLoc`];
-    if ([startDepth, endDepth, thick, texture, matrixRaw, matrixPC, redoxRaw, redoxPC, redoxType, redoxLoc].some(Boolean)) {
-      rows.push([`H${h}`, startDepth || '—', endDepth || '—', thick || '—', texture || '—', matrix || '—', matrixPC || '—', redox || '—', redoxPC || '—', redoxType || '—', redoxLoc || '—']);
+    const restrictive = s[`SoilH${h}RestrictiveYN`] || '';
+    if ([startDepth, endDepth, thick, texture, matrixRaw, matrixPC, redoxRaw, redoxPC, redoxType, redoxLoc, restrictive].some(Boolean)) {
+      rows.push([`H${h}`, startDepth || '—', endDepth || '—', thick || '—', texture || '—', matrix || '—', matrixPC || '—', redox || '—', redoxPC || '—', redoxType || '—', redoxLoc || '—', restrictive || '—']);
     }
   }
-  return rows.length ? rows : [['H1', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—']];
+  return rows.length ? rows : [['H1', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—']];
 }
 
 function vegetationEntriesFromSurvey(s) {
@@ -1390,7 +1447,7 @@ function recordMarkdown(s) {
   lines.push('', '### B. Shrub Species', markdownTable(['Species', '% Cover'], speciesRows(s, 'Shrub', 6)));
   lines.push('', '### C. Herb Species', markdownTable(['Species', '% Cover'], speciesRows(s, 'Herb', 10)));
 
-  lines.push('', '## 5. Hydric Soils', markdownTable(['Horizon','Start Depth (cm)','End Depth (cm)','Thickness (cm)','Texture','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilRows(s)));
+  lines.push('', '## 5. Hydric Soils', markdownTable(['Horizon','Start Depth (cm)','End Depth (cm)','Thickness (cm)','Texture','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location','Restrictive Layer?'], soilRows(s)));
   lines.push('', `**Hydric Soil Indicators:** ${(s.HydricSoilIndicators||[]).join(', ') || '—'}`);
 
   lines.push('', '## 6. Wetland Hydrology');
@@ -1532,7 +1589,7 @@ function recordHTML(s) {
     <div class='section'>
       <h2>Hydric Soils</h2>
       <table>
-        <thead><tr><th>Horizon</th><th>Start Depth (cm)</th><th>End Depth (cm)</th><th>Thickness (cm)</th><th>Texture</th><th>Matrix Color</th><th>Matrix %</th><th>Redox Color</th><th>Redox %</th><th>Redox Type</th><th>Redox Location</th></tr></thead>
+        <thead><tr><th>Horizon</th><th>Start Depth (cm)</th><th>End Depth (cm)</th><th>Thickness (cm)</th><th>Texture</th><th>Matrix Color</th><th>Matrix %</th><th>Redox Color</th><th>Redox %</th><th>Redox Type</th><th>Redox Location</th><th>Restrictive Layer?</th></tr></thead>
         <tbody>${soils.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody>
       </table>
       <p class='chipline'><strong>Hydric Soil Indicators:</strong> ${(s.HydricSoilIndicators||[]).join(', ') || '—'}</p>
@@ -1924,8 +1981,14 @@ async function exportRecordPdf(s, base) {
   drawHeader();
 
   const soilsRows = soilRows(s, true, true);
-  drawTable('Hydric Soils', ['Horizon','Start Depth (cm)','End Depth (cm)','Thickness (cm)','Texture','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location'], soilsRows,
-    [contentW*0.05,contentW*0.08,contentW*0.08,contentW*0.08,contentW*0.09,contentW*0.16,contentW*0.06,contentW*0.16,contentW*0.06,contentW*0.09,contentW*0.09],
+  const soilsPdfRows = soilsRows.map(r => {
+    const start = r[1], end = r[2], restrictive = r[11];
+    const range = (start !== '—' && end !== '—') ? `${start}-${end} cm` : (start !== '—' ? `${start} cm` : '—');
+    const rangeOut = restrictive === 'Yes' ? `${range}\n(restrictive layer)` : range;
+    return [r[0], rangeOut, r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], restrictive];
+  });
+  drawTable('Hydric Soils', ['Horizon','Depth Range (cm)','Thickness (cm)','Texture','Matrix Color','Matrix %','Redox Color','Redox %','Redox Type','Redox Location','Restrictive Layer?'], soilsPdfRows,
+    [contentW*0.06,contentW*0.12,contentW*0.08,contentW*0.09,contentW*0.15,contentW*0.06,contentW*0.15,contentW*0.06,contentW*0.09,contentW*0.09,contentW*0.05],
     { wrapCells: true, fontSize: 7.2 });
 
   const hydroRows = [
@@ -2192,8 +2255,14 @@ async function exportRecordPdfFormStyle(s, base) {
   y += fp2Lines.length * 7 + 5;
 
   sectionBar('Soils');
-  drawTable(['Horizon', 'Start Depth (cm)', 'End Depth (cm)', 'Thickness (cm)', 'Texture', 'Matrix Color', 'Matrix %', 'Redox Color', 'Redox %', 'Redox Type', 'Redox Location'], soilRows(s, true, true),
-    [contentW*0.05,contentW*0.08,contentW*0.08,contentW*0.08,contentW*0.09,contentW*0.16,contentW*0.06,contentW*0.16,contentW*0.06,contentW*0.09,contentW*0.09],
+  const soilsFormRows = soilRows(s, true, true).map(r => {
+    const start = r[1], end = r[2], restrictive = r[11];
+    const range = (start !== '—' && end !== '—') ? `${start}-${end} cm` : (start !== '—' ? `${start} cm` : '—');
+    const rangeOut = restrictive === 'Yes' ? `${range}\n(restrictive layer)` : range;
+    return [r[0], rangeOut, r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], restrictive];
+  });
+  drawTable(['Horizon', 'Depth Range (cm)', 'Thickness (cm)', 'Texture', 'Matrix Color', 'Matrix %', 'Redox Color', 'Redox %', 'Redox Type', 'Redox Location', 'Restrictive Layer?'], soilsFormRows,
+    [contentW*0.06,contentW*0.12,contentW*0.08,contentW*0.09,contentW*0.15,contentW*0.06,contentW*0.15,contentW*0.06,contentW*0.09,contentW*0.09,contentW*0.05],
     { wrapCells: true, fontSize: 7.2 });
   drawKV([
     ['Hydric Soil Indicators', (s.HydricSoilIndicators || []).join(', ') || '—'],
