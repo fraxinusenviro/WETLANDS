@@ -5,6 +5,7 @@ const plotTypes = ["", "Wetland Control Plot", "Upland Control Plot"];
 const localReliefOptions = ["", "Convex", "Concave", "None"];
 const redoxTypeOptions = ["", "Concentrations", "Depletions", "Pore Linings", "Nodules", "Masses", "Soft Masses", "Other"];
 const redoxLocationOptions = ["", "Matrix", "Pore", "Root Channel", "Ped Face", "Combined", "Other"];
+const textureTriangleOptions = ["", "Sand", "Loamy Sand", "Sandy Loam", "Loam", "Silt Loam", "Silt", "Sandy Clay Loam", "Clay Loam", "Silty Clay Loam", "Sandy Clay", "Silty Clay", "Clay"];
 const pageOrder = ["metadata", "vegetation", "hydrology", "soils"];
 
 const hydricSoilIndicators = ["Histosol (A1)","Histic Epipedon (A2)","Black Histic (A3)","Hydrogen Sulfide (A4)","Stratified Layers (A5)","Depleted Below Dark Surface (A11)","Thick Dark Surface (A12)","Sandy Mucky Mineral (S1)","Sandy Gleyed Matrix (S4)","Sandy Redox (S5)","Polyvalue Below Surface (S8)","Thin Dark Surface (S9)","Loamy Gleyed Matrix (F2)","Depleted Matrix (F3)","Redox Dark Surface (F6)","Depleted Dark Surface (F7)","Redox Depressions (F8)"];
@@ -282,6 +283,17 @@ function renderHydrology() {
   root.appendChild(checkGroup('HydrologySecondary', wetlandHydrologySecondary));
 }
 
+function recomputeHorizonThickness(h) {
+  const start = Number(state[`SoilH${h}StartDepthCM`]);
+  const end = Number(state[`SoilH${h}EndDepthCM`]);
+  if (Number.isFinite(start) && Number.isFinite(end)) {
+    const diff = end - start;
+    state[`SoilH${h}ThickCM`] = Number.isFinite(diff) ? String(Math.max(0, +diff.toFixed(2))) : '';
+  } else {
+    state[`SoilH${h}ThickCM`] = '';
+  }
+}
+
 function renderSoils() {
   const root = document.getElementById('soil-fields');
   root.innerHTML = '';
@@ -301,6 +313,7 @@ function renderSoils() {
   root.appendChild(top);
 
   for (let h = 1; h <= soilUi.horizonCount; h++) {
+    recomputeHorizonThickness(h);
     const card = document.createElement('div');
     card.className = 'card';
 
@@ -356,23 +369,47 @@ function renderSoils() {
             });
             input.value = state[key] ?? '';
             input.onchange = () => { state[key] = input.value; queueAutosave(); };
+          } else if (/SoilH\d+Texture$/.test(key)) {
+            input = document.createElement('select');
+            textureTriangleOptions.forEach(v => {
+              const o = document.createElement('option');
+              o.value = v;
+              o.textContent = v || '—';
+              input.appendChild(o);
+            });
+            input.value = state[key] ?? '';
+            input.onchange = () => { state[key] = input.value; queueAutosave(); };
           } else {
             input = document.createElement('input');
             input.type = type;
             if (type === 'number') input.step = 'any';
             input.value = state[key] ?? '';
+            if (/SoilH\d+ThickCM$/.test(key)) {
+              input.readOnly = true;
+              input.title = 'Auto-calculated as End Depth - Start Depth.';
+            }
             if (/SoilH\d+(Matrix|Redox)$/.test(key)) {
               input.setAttribute('list', 'munsell-options');
               input.placeholder = 'e.g., 10YR 4/3';
               input.title = 'Enter a Munsell code to auto-attach the color description.';
             }
-            input.oninput = () => { state[key] = input.value; queueAutosave(); };
+            input.oninput = () => {
+              state[key] = input.value;
+              const m = key.match(/^SoilH(\d+)(StartDepthCM|EndDepthCM)$/);
+              if (m) recomputeHorizonThickness(Number(m[1]));
+              queueAutosave();
+            };
             input.onblur = () => {
               if (/SoilH\d+(Matrix|Redox)$/.test(key)) {
                 const normalized = munsellDisplay(input.value);
                 input.value = normalized;
                 state[key] = normalized;
                 queueAutosave();
+              }
+              const m = key.match(/^SoilH(\d+)(StartDepthCM|EndDepthCM)$/);
+              if (m) {
+                recomputeHorizonThickness(Number(m[1]));
+                renderSoils();
               }
             };
           }
@@ -438,10 +475,11 @@ function bindActions() {
     document.getElementById('instructions-popover')?.close();
   });
   document.getElementById('btn-hydric-guide')?.addEventListener('click', () => {
-    document.getElementById('hydric-guide-popover')?.showModal();
+    showView('hydric-guide');
   });
-  document.getElementById('btn-close-hydric-guide')?.addEventListener('click', () => {
-    document.getElementById('hydric-guide-popover')?.close();
+  document.getElementById('btn-back-from-hydric-guide')?.addEventListener('click', () => {
+    showView('form');
+    setActiveTab(pageOrder.indexOf('soils'));
   });
   document.getElementById('btn-launch-new').onclick = () => { state = defaultSurvey(); renderFormPages(); queueAutosave(true); showView('form'); };
   document.getElementById('btn-open-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); showView('submissions'); };
