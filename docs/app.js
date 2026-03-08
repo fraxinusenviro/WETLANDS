@@ -785,9 +785,9 @@ function munsellDescriptionFor(input) {
 }
 
 function munsellDisplay(input) {
-  const code = normalizeMunsellCode(input).replace(/\s*\([^)]*\)\s*$/, '');
+  const code = normalizeMunsellCode(input).replace(/\s*(\([^)]*\)|\[[^\]]*\])\s*$/, '');
   const desc = munsellDescriptionFor(code);
-  return desc ? `${code} (${desc})` : code;
+  return desc ? `${code} [${desc}]` : code;
 }
 
 async function loadMunsellDescriptions() {
@@ -1506,16 +1506,8 @@ async function exportRecordPdf(s, base) {
 
   const drawTable = (title, headers, rows, widths, opts = {}) => {
     const fontSize = opts.fontSize ?? 8;
-    const rowH = opts.rowH ?? 12;
+    const baseRowH = opts.rowH ?? 12;
     const headerH = opts.showHeader === false ? 0 : (opts.headerH ?? 14);
-    const titleH = 12;
-    const totalH = titleH + headerH + rows.length * rowH + 4;
-
-    if (totalH > (bottom - margin)) {
-      newPage();
-    } else {
-      ensureSpace(totalH);
-    }
 
     sectionTitle(title);
 
@@ -1536,12 +1528,20 @@ async function exportRecordPdf(s, base) {
       headers.forEach((h, i) => {
         doc.text(String(h), cx + 4, y + 9);
         cx += colW[i];
-        if (i < headers.length - 1) doc.line(cx, y, cx, y + headerH + rows.length * rowH);
       });
     }
 
     let ry = y + headerH;
     rows.forEach((r) => {
+      const wrapped = r.map((cell, i) => {
+        const text = String(cell ?? '—');
+        const lines = opts.wrapCells ? doc.splitTextToSize(text, colW[i] - 6) : [doc.splitTextToSize(text, colW[i] - 6)[0] || '—'];
+        return lines.length ? lines : ['—'];
+      });
+      const rowH = Math.max(baseRowH, ...wrapped.map(lines => (lines.length * (fontSize + 1)) + 4));
+
+      ensureSpace(rowH + 4);
+
       const stratum = String(r?.[0] || '').toLowerCase();
       if (opts.shadeByStratum) {
         if (stratum === 'tree') doc.setFillColor(232, 245, 233);
@@ -1552,18 +1552,26 @@ async function exportRecordPdf(s, base) {
       } else {
         doc.rect(x, ry, tableW, rowH);
       }
+
       let rx = x;
-      r.forEach((cell, i) => {
-        const text = String(cell ?? '—');
-        const clipped = doc.splitTextToSize(text, colW[i] - 6)[0] || '—';
+      wrapped.forEach((lines, i) => {
         const makeBold = opts.boldLeftColumn && i === 0;
         const makeItalic = Array.isArray(opts.italicCols) && opts.italicCols.includes(i);
         doc.setFont('helvetica', makeBold ? 'bold' : (makeItalic ? 'italic' : 'normal'));
         doc.setFontSize(fontSize);
         doc.setTextColor(...colors.ink);
-        doc.text(clipped, rx + 3, ry + 8.5);
+        lines.forEach((ln, li) => {
+          doc.text(String(ln || '—'), rx + 3, ry + 8.5 + (li * (fontSize + 1)));
+        });
         rx += colW[i];
       });
+
+      let vx = x;
+      for (let i = 0; i < headers.length - 1; i++) {
+        vx += colW[i];
+        doc.line(vx, ry, vx, ry + rowH);
+      }
+
       ry += rowH;
     });
 
@@ -1719,7 +1727,8 @@ async function exportRecordPdf(s, base) {
 
   const soilsRows = soilRows(s, true);
   drawTable('Hydric Soils', ['Hor','Thk','Texture','Matrix','M%','Redox','R%','Type','Loc'], soilsRows,
-    [contentW*0.07,contentW*0.09,contentW*0.12,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.16]);
+    [contentW*0.06,contentW*0.08,contentW*0.10,contentW*0.22,contentW*0.06,contentW*0.22,contentW*0.06,contentW*0.10,contentW*0.10],
+    { wrapCells: true });
 
   const hydroRows = [
     ['Restrictive Layer', s.RestrictiveLayer || '—'],
@@ -1854,10 +1863,10 @@ async function exportRecordPdfFormStyle(s, base) {
   };
 
   const drawTable = (headers, rows, widths, opts = {}) => {
-    const rowH = 12;
+    const baseRowH = 12;
     const headerH = 14;
-    const totalH = headerH + rows.length * rowH + 4;
-    ensureSpace(totalH);
+
+    ensureSpace(headerH + 10);
 
     doc.setFillColor(226, 232, 240);
     doc.setDrawColor(203, 213, 225);
@@ -1870,20 +1879,30 @@ async function exportRecordPdfFormStyle(s, base) {
     headers.forEach((h, i) => {
       doc.text(String(h), cx + 3, y + 9);
       cx += widths[i];
-      if (i < headers.length - 1) doc.line(cx, y, cx, y + headerH + rows.length * rowH);
     });
 
     y += headerH;
     rows.forEach((r) => {
+      const wrapped = r.map((cell, i) => {
+        const lines = opts.wrapCells ? doc.splitTextToSize(String(cell ?? '—'), widths[i] - 6) : [doc.splitTextToSize(String(cell ?? '—'), widths[i] - 6)[0] || '—'];
+        return lines.length ? lines : ['—'];
+      });
+      const rowH = Math.max(baseRowH, ...wrapped.map(lines => (lines.length * 9) + 4));
+      ensureSpace(rowH + 4);
+
       doc.rect(margin, y, contentW, rowH);
       let rx = margin;
-      r.forEach((cell, i) => {
-        const txt = doc.splitTextToSize(String(cell ?? '—'), widths[i] - 6)[0] || '—';
+      wrapped.forEach((lines, i) => {
         const italic = Array.isArray(opts.italicCols) && opts.italicCols.includes(i);
         doc.setFont('helvetica', i === 0 ? 'bold' : (italic ? 'italic' : 'normal'));
-        doc.text(txt, rx + 3, y + 8.5);
+        lines.forEach((ln, li) => doc.text(String(ln || '—'), rx + 3, y + 8.5 + (li * 9)));
         rx += widths[i];
       });
+      let vx = margin;
+      for (let i = 0; i < headers.length - 1; i++) {
+        vx += widths[i];
+        doc.line(vx, y, vx, y + rowH);
+      }
       y += rowH;
     });
     y += 6;
@@ -1970,7 +1989,8 @@ async function exportRecordPdfFormStyle(s, base) {
 
   sectionBar('Soils');
   drawTable(['Hor', 'Thk (cm)', 'Texture', 'Matrix', 'M%', 'Redox', 'R%', 'Type', 'Loc'], soilRows(s, true),
-    [contentW*0.07,contentW*0.1,contentW*0.12,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.07,contentW*0.14,contentW*0.15]);
+    [contentW*0.06,contentW*0.09,contentW*0.10,contentW*0.22,contentW*0.06,contentW*0.22,contentW*0.06,contentW*0.10,contentW*0.09],
+    { wrapCells: true });
   drawKV([
     ['Hydric Soil Indicators', (s.HydricSoilIndicators || []).join(', ') || '—'],
     ['Restrictive Layer', s.RestrictiveLayer || '—'],
