@@ -7,7 +7,8 @@
   <meta name="theme-color" content="#0f1115" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=14" />
+  <link rel="stylesheet" href="styles.css?v=15" />
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
   <header class="app-header">
@@ -26,15 +27,23 @@
       <h2>Survey Dashboard</h2>
       <p class="muted">Start a new wetland form or reopen previous submissions.</p>
       <div class="cards">
-        <button class="launch-card" id="btn-launch-new">
+        <button class="launch-card launch-primary" id="btn-launch-new">
+          <span class="launch-icon" aria-hidden="true"><i data-lucide="file-plus-2"></i></span>
           <strong>Launch New Form</strong>
           <span>Create a fresh control-plot survey.</span>
         </button>
-        <button class="launch-card" id="btn-open-submissions">
+        <button class="launch-card launch-submissions" id="btn-open-submissions">
+          <span class="launch-icon" aria-hidden="true"><i data-lucide="folder-check"></i></span>
           <strong>View Submitted Forms</strong>
           <span>Browse, inspect, and reload prior submissions.</span>
         </button>
-        <button class="launch-card" id="btn-open-plant-ref">
+        <button class="launch-card launch-drafts" id="btn-open-drafts">
+          <span class="launch-icon" aria-hidden="true"><i data-lucide="save-all"></i></span>
+          <strong>Drafts Library</strong>
+          <span>Resume saved in-progress forms from where you left off.</span>
+        </button>
+        <button class="launch-card launch-reference" id="btn-open-plant-ref">
+          <span class="launch-icon" aria-hidden="true"><i data-lucide="leaf"></i></span>
           <strong>Plant Reference Lookup</strong>
           <span>Search NS indicator records and view full species details.</span>
         </button>
@@ -103,8 +112,22 @@
         </div>
       </div>
     </section>
+
+    <section id="view-drafts" class="view">
+      <h2>Drafts Library</h2>
+      <p class="muted">Saved in-progress forms. Resume from the exact section where work paused.</p>
+      <div class="submissions-layout">
+        <div>
+          <div class="actions"><button id="btn-refresh-drafts">Refresh</button></div>
+          <div id="draft-list" class="submission-list"></div>
+        </div>
+        <div class="card" id="draft-detail">
+          <p class="muted">Select a draft to preview details.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

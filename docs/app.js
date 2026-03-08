@@ -19,6 +19,7 @@ const DB_NAME = 'wetlands-app-db';
 const DB_VERSION = 1;
 const KV_STORE = 'kv';
 const DRAFT_KEY = 'wetlandCurrentDraft';
+const DRAFT_LIBRARY_KEY = 'wetlandDraftLibrary';
 const SURVEYS_KEY = 'wetlandSurveys';
 
 let speciesList = ["ACERrubr", "PICErube", "QUERrubr", "KALMangu", "VIBUcass", "PTERaqui"];
@@ -28,6 +29,7 @@ let plantReferenceRecords = [];
 let speciesDataDictionary = {};
 let state = defaultSurvey();
 let surveys = [];
+let draftsLibrary = [];
 let activeTabIndex = 0;
 let deferredPrompt = null;
 let autosaveTimer = null;
@@ -49,6 +51,7 @@ let soilUi = {
 async function init() {
   await migrateLegacyLocalStorage();
   surveys = await loadSurveys();
+  draftsLibrary = await loadDraftLibrary();
   state = (await loadDraft()) || defaultSurvey();
 
   await loadSpecies();
@@ -58,6 +61,7 @@ async function init() {
   bindActions();
   await refreshDashboard();
   renderSubmissions();
+  renderDraftsLibrary();
   showView("home");
 }
 
@@ -73,6 +77,11 @@ function defaultSurvey() {
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(`view-${name}`)?.classList.add('active');
+  refreshLucideIcons();
+}
+
+function refreshLucideIcons() {
+  if (globalThis.lucide?.createIcons) globalThis.lucide.createIcons();
 }
 
 function buildTabs() {
@@ -359,11 +368,21 @@ function checkGroup(key, options) {
 }
 
 function bindActions() {
-  document.getElementById('btn-home').onclick = async () => { await refreshDashboard(); showView('home'); };
+  document.getElementById('btn-home').onclick = async () => {
+    if (document.getElementById('view-form')?.classList.contains('active')) {
+      const goHome = confirm('Return to dashboard? Your in-progress form will be saved to Drafts Library so you can resume later.');
+      if (!goHome) return;
+      await saveDraftSnapshot(`Dashboard return • ${state.SiteID || state.PLOT_ID || 'Untitled'}`);
+    }
+    await refreshDashboard();
+    showView('home');
+  };
   document.getElementById('btn-launch-new').onclick = () => { state = defaultSurvey(); renderFormPages(); queueAutosave(true); showView('form'); };
   document.getElementById('btn-open-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); showView('submissions'); };
+  document.getElementById('btn-open-drafts').onclick = async () => { draftsLibrary = await loadDraftLibrary(); renderDraftsLibrary(); showView('drafts'); };
   document.getElementById('btn-open-plant-ref').onclick = () => { renderPlantReferenceList(''); showView('plant-ref'); };
   document.getElementById('btn-refresh-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); };
+  document.getElementById('btn-refresh-drafts').onclick = async () => { draftsLibrary = await loadDraftLibrary(); renderDraftsLibrary(); };
   const plantSearch = document.getElementById('plant-ref-search');
   if (plantSearch) {
     plantSearch.oninput = () => renderPlantReferenceList(plantSearch.value || '');
@@ -488,14 +507,71 @@ function renderSubmissions() {
   });
 }
 
+function renderDraftsLibrary() {
+  const list = document.getElementById('draft-list');
+  const detail = document.getElementById('draft-detail');
+  if (!list || !detail) return;
+  list.innerHTML = '';
+
+  if (!draftsLibrary.length) {
+    list.innerHTML = `<div class='card muted'>No draft snapshots yet.</div>`;
+    detail.innerHTML = `<p class='muted'>No draft selected.</p>`;
+    return;
+  }
+
+  [...draftsLibrary].reverse().forEach(d => {
+    const survey = d.survey || {};
+    const pageName = pageOrder[d.activeTabIndex] || pageOrder[0];
+    const label = pageName[0].toUpperCase() + pageName.slice(1);
+    const item = document.createElement('div');
+    item.className = 'submission-item';
+    item.innerHTML = `<h4>${d.name || survey.SiteID || 'Untitled Draft'} · ${survey.PLOT_ID || 'No Plot ID'}</h4><p>${new Date(d.timestamp).toLocaleString()} · Resume on ${label}</p><div class='row'><button data-preview='${d.id}'>Preview</button><button data-resume='${d.id}'>Resume Draft</button><button data-delete='${d.id}'>Delete</button></div>`;
+    list.appendChild(item);
+  });
+
+  list.querySelectorAll('button[data-preview]').forEach(b => b.onclick = () => {
+    const d = draftsLibrary.find(x => x.id === b.dataset.preview);
+    if (!d) return;
+    const s = d.survey || {};
+    const pageName = pageOrder[d.activeTabIndex] || pageOrder[0];
+    detail.innerHTML = `<h3>${d.name || s.SiteID || 'Untitled Draft'}</h3><p class='muted'>Resume section: ${pageName[0].toUpperCase() + pageName.slice(1)}</p><p><strong>Site ID:</strong> ${s.SiteID || '—'}</p><p><strong>Plot ID:</strong> ${s.PLOT_ID || '—'}</p><p><strong>Observer:</strong> ${s.observer || '—'}</p><p><strong>Last update:</strong> ${new Date(d.timestamp).toLocaleString()}</p>`;
+  });
+
+  list.querySelectorAll('button[data-resume]').forEach(b => b.onclick = async () => {
+    const d = draftsLibrary.find(x => x.id === b.dataset.resume);
+    if (!d) return;
+    state = cloneData(d.survey || defaultSurvey());
+    await saveDraft(state);
+    renderFormPages();
+    showView('form');
+    setActiveTab(typeof d.activeTabIndex === 'number' ? d.activeTabIndex : 0);
+  });
+
+  list.querySelectorAll('button[data-delete]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.delete;
+    if (!confirm('Delete this draft snapshot?')) return;
+    draftsLibrary = draftsLibrary.filter(x => x.id !== id);
+    await saveDraftLibrary(draftsLibrary);
+    await refreshDashboard();
+    renderDraftsLibrary();
+  });
+
+  refreshLucideIcons();
+}
+
 async function refreshDashboard() {
   const stats = document.getElementById('dashboard-stats');
   const draft = await loadDraft();
+  const lastSubmitted = surveys.at(-1);
+  const lastDraft = draftsLibrary.at(-1);
   stats.innerHTML = [
-    `<div class='card'><h3>${surveys.length}</h3><p class='muted'>Submitted Forms</p></div>`,
-    `<div class='card'><h3>${draft ? 'Yes' : 'No'}</h3><p class='muted'>Draft Available</p></div>`,
-    `<div class='card'><h3>${surveys.at(-1)?.SiteID || '-'}</h3><p class='muted'>Latest Site ID</p></div>`
+    `<div class='card'><div class='stat-head'><i data-lucide='clipboard-check'></i><h3>${surveys.length}</h3></div><p class='stat-note'>Submitted Forms</p></div>`,
+    `<div class='card'><div class='stat-head'><i data-lucide='save'></i><h3>${draft ? 'Active' : 'None'}</h3></div><p class='stat-note'>Current Working Draft</p></div>`,
+    `<div class='card'><div class='stat-head'><i data-lucide='library'></i><h3>${draftsLibrary.length}</h3></div><p class='stat-note'>Draft Snapshots in Library</p></div>`,
+    `<div class='card'><div class='stat-head'><i data-lucide='map-pin'></i><h3>${lastSubmitted?.SiteID || '-'}</h3></div><p class='stat-note'>Latest submitted site · ${lastSubmitted ? new Date(lastSubmitted.timestamp).toLocaleDateString() : 'No submissions yet'}</p></div>`,
+    `<div class='card'><div class='stat-head'><i data-lucide='clock-3'></i><h3>${lastDraft?.survey?.PLOT_ID || '-'}</h3></div><p class='stat-note'>Most recent draft snapshot · ${lastDraft ? new Date(lastDraft.timestamp).toLocaleDateString() : 'No snapshots yet'}</p></div>`
   ].join('');
+  refreshLucideIcons();
 }
 
 function normalizeStatus(status) {
@@ -817,16 +893,38 @@ async function migrateLegacyLocalStorage() {
         try { await idbSet(SURVEYS_KEY, JSON.parse(rawSurveys)); } catch {}
       }
     }
+    const existingDraftLibrary = await idbGet(DRAFT_LIBRARY_KEY, null);
+    if (existingDraftLibrary == null) {
+      const rawDraftLibrary = localStorage.getItem(DRAFT_LIBRARY_KEY);
+      if (rawDraftLibrary) {
+        try { await idbSet(DRAFT_LIBRARY_KEY, JSON.parse(rawDraftLibrary)); } catch {}
+      }
+    }
   } catch (err) {
     console.warn('Legacy migration skipped:', err);
   }
 }
 
 async function loadDraft() { return await idbGet(DRAFT_KEY, null); }
+async function loadDraftLibrary() { return await idbGet(DRAFT_LIBRARY_KEY, []); }
 async function loadSurveys() { return await idbGet(SURVEYS_KEY, []); }
 async function saveDraft(draft) { await idbSet(DRAFT_KEY, draft); }
+async function saveDraftLibrary(rows) { await idbSet(DRAFT_LIBRARY_KEY, rows); }
 async function saveSurveys(rows) { await idbSet(SURVEYS_KEY, rows); }
 async function clearDraft() { await idbDelete(DRAFT_KEY); }
+
+async function saveDraftSnapshot(name = 'In-progress draft') {
+  const snapshot = {
+    id: makeId(),
+    name,
+    timestamp: new Date().toISOString(),
+    activeTabIndex,
+    survey: cloneData(state)
+  };
+  draftsLibrary = [...draftsLibrary, snapshot].slice(-100);
+  await saveDraftLibrary(draftsLibrary);
+  await saveDraft(state);
+}
 
 function queueAutosave(immediate=false) {
   const save = async () => {
