@@ -173,11 +173,14 @@ function renderVegetation() {
         species.value = state[`${g}Sp${i}`] ?? '';
         species.oninput = () => {
           state[`${g}Sp${i}`] = species.value;
+          queueAutosave();
+        };
+        species.onchange = () => {
           applySpeciesLookup(g, i, species.value);
+          recomputeDominanceFlags();
           queueAutosave();
           renderVegetation();
         };
-        species.onchange = species.oninput;
 
         const status = document.createElement('input');
         status.type = 'text';
@@ -189,12 +192,18 @@ function renderVegetation() {
         cov.type = 'number';
         cov.step = 'any';
         cov.value = state[`${g}Sp${i}Cov`] ?? '';
-        cov.oninput = () => { state[`${g}Sp${i}Cov`] = cov.value; queueAutosave(); renderVegetation(); };
+        cov.oninput = () => {
+          state[`${g}Sp${i}Cov`] = cov.value;
+          recomputeDominanceFlags();
+          queueAutosave();
+          renderVegetation();
+        };
 
         const dom = document.createElement('input');
         dom.type = 'checkbox';
         dom.checked = !!state[`${g}Sp${i}Dom`];
-        dom.onchange = () => { state[`${g}Sp${i}Dom`] = dom.checked; queueAutosave(); renderVegetation(); };
+        dom.disabled = true;
+        dom.title = 'Auto-calculated using 50/20 rule';
 
         row.appendChild(species);
         row.appendChild(status);
@@ -207,6 +216,7 @@ function renderVegetation() {
     root.appendChild(card);
   });
 
+  recomputeDominanceFlags();
   const metrics = vegetationMetrics();
   const summary = document.createElement('div');
   summary.className = 'card';
@@ -633,7 +643,16 @@ function findSpeciesRecord(query) {
   const q = String(query || '').trim().toLowerCase();
   if (!q) return null;
   if (speciesDisplayMap.has(query)) return speciesDisplayMap.get(query);
-  return speciesRecords.find(r => speciesSearchKey(r).includes(q)) || null;
+
+  // strict matching only to avoid aggressive auto-replacement while typing
+  const exact = speciesRecords.find(r => {
+    const keys = [r.mcode, r.elcode, r.commonName, r.scientificName].filter(Boolean).map(v => String(v).toLowerCase());
+    return keys.includes(q);
+  });
+  if (exact) return exact;
+
+  // exact display text (case-insensitive)
+  return speciesRecords.find(r => speciesDisplay(r).toLowerCase() === q) || null;
 }
 
 function applySpeciesLookup(group, i, raw) {
@@ -873,36 +892,49 @@ function vegetationEntries() {
 }
 
 function autoDominantSet(entries) {
+  // 50/20 rule by stratum:
+  // 1) sort by descending absolute cover
+  // 2) include species until cumulative cover > 50% of total stratum cover
+  // 3) include any additional species with >= 20% of total stratum cover
   const byGroup = new Map();
   entries.forEach(e => {
     if (!byGroup.has(e.group)) byGroup.set(e.group, []);
     byGroup.get(e.group).push(e);
   });
+
   const set = new Set();
   for (const arr of byGroup.values()) {
     const sorted = [...arr].filter(e => e.cover > 0).sort((a, b) => b.cover - a.cover);
-    let sum = 0;
-    for (let idx = 0; idx < sorted.length; idx++) {
-      const e = sorted[idx];
+    const total = sorted.reduce((acc, e) => acc + (e.cover || 0), 0);
+    if (total <= 0) continue;
+
+    let cum = 0;
+    for (const e of sorted) {
       set.add(`${e.group}:${e.i}`);
-      sum += e.cover;
-      if (sum > 50) {
-        const threshold = e.cover;
-        for (let j = idx + 1; j < sorted.length; j++) {
-          if (sorted[j].cover === threshold) set.add(`${sorted[j].group}:${sorted[j].i}`);
-          else break;
-        }
-        break;
-      }
+      cum += e.cover;
+      if (cum > (0.5 * total)) break;
     }
+
+    const min20 = 0.2 * total;
+    sorted.forEach(e => {
+      if (e.cover >= min20) set.add(`${e.group}:${e.i}`);
+    });
   }
   return set;
+}
+
+function recomputeDominanceFlags() {
+  const entries = vegetationEntries();
+  const autoSet = autoDominantSet(entries);
+  entries.forEach(e => {
+    state[`${e.group}Sp${e.i}Dom`] = autoSet.has(`${e.group}:${e.i}`);
+  });
 }
 
 function vegetationMetrics() {
   const entries = vegetationEntries();
   const autoSet = autoDominantSet(entries);
-  const dominant = entries.filter(e => e.manualDom || autoSet.has(`${e.group}:${e.i}`));
+  const dominant = entries.filter(e => autoSet.has(`${e.group}:${e.i}`));
 
   const dominanceB = dominant.length;
   const dominanceA = dominant.filter(e => ['OBL', 'FACW', 'FAC'].includes(e.status)).length;
