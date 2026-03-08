@@ -69,6 +69,28 @@ main { padding: 1rem 1rem 1.2rem; max-width: 1400px; margin: 0 auto; }
   gap: .45rem;
 }
 .icon-left svg { width: 1rem; height: 1rem; }
+.alert-badge {
+  margin-left: .35rem;
+  background: #d53131;
+  color: #fff;
+  border-radius: 999px;
+  font-size: .74rem;
+  font-weight: 700;
+  padding: .05rem .4rem;
+  border: 1px solid rgba(255,255,255,.35);
+}
+#view-hydric-guide li.candidate-hit {
+  background: rgba(211, 230, 255, .12);
+  border-left: 3px solid #6ec1ff;
+  padding: .35rem .45rem;
+  border-radius: .3rem;
+}
+#view-hydric-guide li.candidate-hit strong::after {
+  content: '  • candidate';
+  color: #8ad1ff;
+  font-size: .82em;
+  font-weight: 600;
+}
 
 h2 { margin-top: .35rem; font-size: 2rem; letter-spacing: .2px; }
 .muted { color: var(--muted); }

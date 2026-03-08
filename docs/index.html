@@ -102,7 +102,7 @@
       <section class="page" data-page="soils">
         <h2>Soils</h2>
         <div class="actions" style="margin-top:.2rem">
-          <button type="button" id="btn-hydric-guide" class="icon-left"><i data-lucide="book-marked"></i><span>Hydric Soil Reference Guide</span></button>
+          <button type="button" id="btn-hydric-guide" class="icon-left"><i data-lucide="book-marked"></i><span>Hydric Soil Reference Guide</span><span id="hydric-candidate-badge" class="alert-badge" hidden>0</span></button>
         </div>
         <div id="soil-fields"></div>
         <div class="actions">
@@ -146,46 +146,46 @@
       <div class="card">
         <h3 class="group-title">All Soils (A Indicators)</h3>
         <ul>
-          <li><strong>A1 Histosol:</strong> Organic soil with at least 40 cm thickness (also includes wetland organic soils over bedrock/fragmental material with organic-filled interstices).</li>
-          <li><strong>A2 Histic Epipedon:</strong> Organic material 20–40 cm thick over mineral soil with chroma ≤2; requires supporting aquic evidence.</li>
-          <li><strong>A4 Hydrogen Sulfide:</strong> Rotten egg odour detected within 30 cm of surface.</li>
-          <li><strong>A5 Stratified Layers:</strong> Stratified layers beginning within 15 cm with low value/chroma and organic requirements for sandy layers.</li>
-          <li><strong>A11 Depleted Below Dark Surface:</strong> Depleted/gleyed matrix (≥60% chroma ≤2) within 30 cm plus strict thickness/overlying color criteria.</li>
-          <li><strong>A12 Thick Dark Surface:</strong> Depleted/gleyed matrix starts at or below 30 cm with dark low-chroma overlying layers.</li>
+          <li id="indicator-A1"><strong>A1 Histosol:</strong> Organic soil with at least 40 cm thickness (also includes wetland organic soils over bedrock/fragmental material with organic-filled interstices).</li>
+          <li id="indicator-A2"><strong>A2 Histic Epipedon:</strong> Organic material 20–40 cm thick over mineral soil with chroma ≤2; requires supporting aquic evidence.</li>
+          <li id="indicator-A4"><strong>A4 Hydrogen Sulfide:</strong> Rotten egg odour detected within 30 cm of surface.</li>
+          <li id="indicator-A5"><strong>A5 Stratified Layers:</strong> Stratified layers beginning within 15 cm with low value/chroma and organic requirements for sandy layers.</li>
+          <li id="indicator-A11"><strong>A11 Depleted Below Dark Surface:</strong> Depleted/gleyed matrix (≥60% chroma ≤2) within 30 cm plus strict thickness/overlying color criteria.</li>
+          <li id="indicator-A12"><strong>A12 Thick Dark Surface:</strong> Depleted/gleyed matrix starts at or below 30 cm with dark low-chroma overlying layers.</li>
         </ul>
       </div>
 
       <div class="card">
         <h3 class="group-title">Sandy Soils (S Indicators)</h3>
         <ul>
-          <li><strong>S1 Sandy Mucky Mineral:</strong> Mucky modified sandy layer ≥5 cm starting within 15 cm.</li>
-          <li><strong>S4 Sandy Gleyed Matrix:</strong> Gleyed matrix occupies ≥60% of a layer starting within 15 cm.</li>
-          <li><strong>S5 Sandy Redox:</strong> Layer within 15 cm with matrix ≥60% chroma ≤2 and qualifying redox concentrations.</li>
-          <li><strong>S6 Stripped Matrix:</strong> Iron/organic stripped and translocated splotchy pattern, stripped zones ≥10% volume.</li>
-          <li><strong>S7 Dark Surface:</strong> Dark low-chroma layer 10 cm thick within 15 cm with ≥70% coated sand grains.</li>
-          <li><strong>S8 Polyvalue Below Surface:</strong> Dark layer within 15 cm with polyvalue pattern below to 30 cm/spodic horizon.</li>
-          <li><strong>S9 Thin Dark Surface:</strong> Dark layer ≥5 cm within 15 cm, underlain by low-chroma material to 30 cm/spodic horizon.</li>
+          <li id="indicator-S1"><strong>S1 Sandy Mucky Mineral:</strong> Mucky modified sandy layer ≥5 cm starting within 15 cm.</li>
+          <li id="indicator-S4"><strong>S4 Sandy Gleyed Matrix:</strong> Gleyed matrix occupies ≥60% of a layer starting within 15 cm.</li>
+          <li id="indicator-S5"><strong>S5 Sandy Redox:</strong> Layer within 15 cm with matrix ≥60% chroma ≤2 and qualifying redox concentrations.</li>
+          <li id="indicator-S6"><strong>S6 Stripped Matrix:</strong> Iron/organic stripped and translocated splotchy pattern, stripped zones ≥10% volume.</li>
+          <li id="indicator-S7"><strong>S7 Dark Surface:</strong> Dark low-chroma layer 10 cm thick within 15 cm with ≥70% coated sand grains.</li>
+          <li id="indicator-S8"><strong>S8 Polyvalue Below Surface:</strong> Dark layer within 15 cm with polyvalue pattern below to 30 cm/spodic horizon.</li>
+          <li id="indicator-S9"><strong>S9 Thin Dark Surface:</strong> Dark layer ≥5 cm within 15 cm, underlain by low-chroma material to 30 cm/spodic horizon.</li>
         </ul>
       </div>
 
       <div class="card">
         <h3 class="group-title">Loamy / Clayey Soils (F Indicators)</h3>
         <ul>
-          <li><strong>F2 Loamy Gleyed Matrix:</strong> Gleyed matrix ≥60% in layer beginning within 30 cm.</li>
-          <li><strong>F3 Depleted Matrix:</strong> Depleted matrix ≥60% chroma ≤2 with required depth/thickness combinations.</li>
-          <li><strong>F6 Redox Dark Surface:</strong> Dark mineral layer in upper 30 cm with required redox concentration thresholds.</li>
-          <li><strong>F7 Depleted Dark Surface:</strong> Dark surface with qualifying redox depletions and matrix conditions.</li>
-          <li><strong>F8 Redox Depressions:</strong> In closed depressions, ≥5% distinct/prominent redox concentrations in upper 15 cm.</li>
+          <li id="indicator-F2"><strong>F2 Loamy Gleyed Matrix:</strong> Gleyed matrix ≥60% in layer beginning within 30 cm.</li>
+          <li id="indicator-F3"><strong>F3 Depleted Matrix:</strong> Depleted matrix ≥60% chroma ≤2 with required depth/thickness combinations.</li>
+          <li id="indicator-F6"><strong>F6 Redox Dark Surface:</strong> Dark mineral layer in upper 30 cm with required redox concentration thresholds.</li>
+          <li id="indicator-F7"><strong>F7 Depleted Dark Surface:</strong> Dark surface with qualifying redox depletions and matrix conditions.</li>
+          <li id="indicator-F8"><strong>F8 Redox Depressions:</strong> In closed depressions, ≥5% distinct/prominent redox concentrations in upper 15 cm.</li>
         </ul>
       </div>
 
       <div class="card">
         <h3 class="group-title">Problem Soil Indicators (Conditional Use)</h3>
         <ul>
-          <li><strong>F21 Red Parent Material</strong></li>
-          <li><strong>TF12 Very Shallow Dark Surface</strong></li>
-          <li><strong>S3 5 cm Mucky Peat or Peat</strong></li>
-          <li><strong>F12 Iron/Manganese Masses</strong></li>
+          <li id="indicator-F21"><strong>F21 Red Parent Material</strong></li>
+          <li id="indicator-TF12"><strong>TF12 Very Shallow Dark Surface</strong></li>
+          <li id="indicator-S3"><strong>S3 5 cm Mucky Peat or Peat</strong></li>
+          <li id="indicator-F12"><strong>F12 Iron/Manganese Masses</strong></li>
         </ul>
         <p class="muted">Use conditional indicators where standard indicators fail but hydrology and hydrophytic vegetation support hydric interpretation.</p>
       </div>
@@ -206,6 +206,6 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>

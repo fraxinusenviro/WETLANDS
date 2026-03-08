@@ -5,7 +5,7 @@ const plotTypes = ["", "Wetland Control Plot", "Upland Control Plot"];
 const localReliefOptions = ["", "Convex", "Concave", "None"];
 const redoxTypeOptions = ["", "Concentrations", "Depletions", "Pore Linings", "Nodules", "Masses", "Soft Masses", "Other"];
 const redoxLocationOptions = ["", "Matrix", "Pore", "Root Channel", "Ped Face", "Combined", "Other"];
-const textureTriangleOptions = ["", "Sand", "Loamy Sand", "Sandy Loam", "Loam", "Silt Loam", "Silt", "Sandy Clay Loam", "Clay Loam", "Silty Clay Loam", "Sandy Clay", "Silty Clay", "Clay"];
+const textureTriangleOptions = ["", "Organic", "Sand", "Loamy Sand", "Sandy Loam", "Loam", "Silt Loam", "Silt", "Sandy Clay Loam", "Clay Loam", "Silty Clay Loam", "Sandy Clay", "Silty Clay", "Clay"];
 const pageOrder = ["metadata", "vegetation", "hydrology", "soils"];
 
 const hydricSoilIndicators = ["Histosol (A1)","Histic Epipedon (A2)","Black Histic (A3)","Hydrogen Sulfide (A4)","Stratified Layers (A5)","Depleted Below Dark Surface (A11)","Thick Dark Surface (A12)","Sandy Mucky Mineral (S1)","Sandy Gleyed Matrix (S4)","Sandy Redox (S5)","Polyvalue Below Surface (S8)","Thin Dark Surface (S9)","Loamy Gleyed Matrix (F2)","Depleted Matrix (F3)","Redox Dark Surface (F6)","Depleted Dark Surface (F7)","Redox Depressions (F8)"];
@@ -427,6 +427,18 @@ function renderSoils() {
     root.appendChild(card);
   }
 
+  const issues = computeHorizonValidationIssues();
+  const candidates = updateHydricGuideIndicators();
+  const qc = document.createElement('div');
+  qc.className = 'card';
+  qc.innerHTML = `
+    <h3 class='group-title'>Horizon Quality Check</h3>
+    <p class='muted'>${issues.length ? 'Please review the flagged horizon issues:' : 'No horizon continuity/depth issues detected.'}</p>
+    ${issues.length ? `<ul>${issues.map(i => `<li>${i}</li>`).join('')}</ul>` : ''}
+    <p class='muted'>Hydric candidate indicators from current soil entries: <strong>${candidates.length ? candidates.join(', ') : 'None yet'}</strong></p>
+  `;
+  root.appendChild(qc);
+
   root.appendChild(checkGroup('HydricSoilIndicators', hydricSoilIndicators));
 
   root.querySelector('[data-soil-minus]')?.addEventListener('click', () => {
@@ -475,6 +487,7 @@ function bindActions() {
     document.getElementById('instructions-popover')?.close();
   });
   document.getElementById('btn-hydric-guide')?.addEventListener('click', () => {
+    updateHydricGuideIndicators();
     showView('hydric-guide');
   });
   document.getElementById('btn-back-from-hydric-guide')?.addEventListener('click', () => {
@@ -852,6 +865,108 @@ function munsellDisplay(input) {
   const code = normalizeMunsellCode(input).replace(/\s*(\([^)]*\)|\[[^\]]*\])\s*$/, '');
   const desc = munsellDescriptionFor(code);
   return desc ? `${code} [${desc}]` : code;
+}
+
+function parseMunsellCode(input) {
+  const code = normalizeMunsellCode(input || '').replace(/\s*(\([^)]*\)|\[[^\]]*\])\s*$/, '');
+  const m = code.match(/^(?:[0-9]{1,2}(?:\.[0-9])?[A-Z]{1,3})\s+([0-9](?:\.[0-9])?)\/([0-9](?:\.[0-9])?)$/);
+  if (!m) return { code, value: NaN, chroma: NaN };
+  return { code, value: Number(m[1]), chroma: Number(m[2]) };
+}
+
+function isSandyTexture(texture) {
+  return ['Sand', 'Loamy Sand', 'Sandy Loam'].includes(String(texture || ''));
+}
+
+function isLoamyClayeyTexture(texture) {
+  return ['Loam', 'Silt Loam', 'Silt', 'Sandy Clay Loam', 'Clay Loam', 'Silty Clay Loam', 'Sandy Clay', 'Silty Clay', 'Clay'].includes(String(texture || ''));
+}
+
+function isGleyedByHue(code, value) {
+  const hue = String(code || '').split(' ')[0] || '';
+  const gleyHues = new Set(['N', '10Y', '5GY', '10GY', '5G', '10G', '5BG', '10BG', '5B', '10B', '5PB']);
+  return gleyHues.has(hue) && Number(value) >= 4;
+}
+
+function horizonRows() {
+  const rows = [];
+  for (let h = 1; h <= soilUi.horizonCount; h++) {
+    const start = Number(state[`SoilH${h}StartDepthCM`]);
+    const end = Number(state[`SoilH${h}EndDepthCM`]);
+    const thick = Number(state[`SoilH${h}ThickCM`]);
+    const matrixPC = Number(state[`SoilH${h}MatrixPC`]);
+    const redoxPC = Number(state[`SoilH${h}RedoxPC`]);
+    const texture = state[`SoilH${h}Texture`] || '';
+    const matrix = parseMunsellCode(state[`SoilH${h}Matrix`]);
+    const redoxType = String(state[`SoilH${h}RedoxType`] || '');
+    rows.push({ h, start, end, thick, matrixPC, redoxPC, texture, matrix, redoxType });
+  }
+  return rows;
+}
+
+function computeHorizonValidationIssues() {
+  const issues = [];
+  const rows = horizonRows();
+  rows.forEach(r => {
+    if (Number.isFinite(r.start) && Number.isFinite(r.end) && r.end < r.start) {
+      issues.push(`H${r.h}: End depth is less than start depth.`);
+    }
+    if (!Number.isFinite(r.start) || !Number.isFinite(r.end)) {
+      issues.push(`H${r.h}: Start and end depth should both be entered.`);
+    }
+  });
+  for (let i = 0; i < rows.length - 1; i++) {
+    const a = rows[i], b = rows[i + 1];
+    if (Number.isFinite(a.end) && Number.isFinite(b.start)) {
+      if (b.start > a.end) issues.push(`Gap between H${a.h} and H${b.h} (${a.end}–${b.start} cm).`);
+      if (b.start < a.end) issues.push(`Overlap between H${a.h} and H${b.h} (${b.start} < ${a.end} cm).`);
+    }
+  }
+  return [...new Set(issues)];
+}
+
+function computeHydricCandidateIndicators() {
+  const candidates = new Set();
+  const rows = horizonRows();
+  rows.forEach(r => {
+    const lowChroma = Number.isFinite(r.matrix.chroma) && r.matrix.chroma <= 2;
+    const darkSurface = Number.isFinite(r.matrix.value) && r.matrix.value <= 3 && Number.isFinite(r.matrix.chroma) && r.matrix.chroma <= 1;
+    const gleyed = isGleyedByHue(r.matrix.code, r.matrix.value);
+
+    if (String(r.texture) === 'Organic' && Number.isFinite(r.thick) && r.thick >= 40) candidates.add('A1');
+    if (String(r.texture) === 'Organic' && Number.isFinite(r.thick) && r.thick >= 20 && r.thick < 40) candidates.add('A2');
+    if (Number.isFinite(r.start) && Number.isFinite(r.thick) && r.start <= 30 && r.thick >= 15 && lowChroma && r.matrixPC >= 60) candidates.add('A11');
+    if (Number.isFinite(r.start) && Number.isFinite(r.thick) && r.start >= 30 && r.thick >= 15 && lowChroma && r.matrixPC >= 60) candidates.add('A12');
+
+    if (isSandyTexture(r.texture)) {
+      if (Number.isFinite(r.start) && r.start <= 15 && gleyed && r.matrixPC >= 60) candidates.add('S4');
+      if (Number.isFinite(r.start) && Number.isFinite(r.thick) && r.start <= 15 && r.thick >= 10 && lowChroma && r.matrixPC >= 60 && r.redoxPC >= 2 && ['Concentrations','Pore Linings','Soft Masses','Masses'].includes(r.redoxType)) candidates.add('S5');
+      if (Number.isFinite(r.start) && Number.isFinite(r.thick) && r.start <= 15 && r.thick >= 5 && darkSurface) candidates.add('S9');
+    }
+
+    if (isLoamyClayeyTexture(r.texture)) {
+      if (Number.isFinite(r.start) && r.start <= 30 && gleyed && r.matrixPC >= 60) candidates.add('F2');
+      if (lowChroma && r.matrixPC >= 60 && ((Number.isFinite(r.thick) && r.thick >= 5 && Number.isFinite(r.start) && r.start <= 15) || (Number.isFinite(r.thick) && r.thick >= 15 && Number.isFinite(r.start) && r.start <= 25))) candidates.add('F3');
+      if (Number.isFinite(r.end) && r.end <= 30 && Number.isFinite(r.thick) && r.thick >= 10) {
+        if ((r.matrix.value <= 3 && r.matrix.chroma <= 1 && r.redoxPC >= 2) || (r.matrix.value <= 3 && r.matrix.chroma <= 2 && r.redoxPC >= 5)) candidates.add('F6');
+        if ((r.matrix.value <= 3 && r.matrix.chroma <= 1 && r.redoxPC >= 10) || (r.matrix.value <= 3 && r.matrix.chroma <= 2 && r.redoxPC >= 20)) candidates.add('F7');
+      }
+    }
+  });
+  return [...candidates];
+}
+
+function updateHydricGuideIndicators() {
+  const candidates = computeHydricCandidateIndicators();
+  document.querySelectorAll('#view-hydric-guide li[id^="indicator-"]').forEach(li => li.classList.remove('candidate-hit'));
+  candidates.forEach(code => document.getElementById(`indicator-${code}`)?.classList.add('candidate-hit'));
+
+  const badge = document.getElementById('hydric-candidate-badge');
+  if (badge) {
+    badge.hidden = candidates.length === 0;
+    badge.textContent = String(candidates.length);
+  }
+  return candidates;
 }
 
 async function loadMunsellDescriptions() {
