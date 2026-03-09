@@ -245,11 +245,11 @@ button.primary {
 .veg-card-herb { background:linear-gradient(165deg,#2b301e,#202613); border-color:#56683a; }
 
 .veg-table { display:grid; gap:.42rem; }
-.veg-row { display:grid; grid-template-columns: 34px minmax(140px,1fr) 92px 44px; gap:.4rem; align-items:center; }
+.veg-row { display:grid; grid-template-columns: 22px minmax(160px,1fr) 64px 40px; gap:.35rem; align-items:center; }
 .veg-row input { width:100%; min-width:0; padding:.52rem .56rem; border-radius:.45rem; border:1px solid #324869; background:#0f1827; color:var(--text); }
 .veg-row input[type='checkbox'] { width:18px; height:18px; justify-self:center; accent-color:#4cd18f; padding:0; }
 .veg-header { color:var(--muted); font-size:.84rem; font-weight:600; padding:0 .1rem; }
-.veg-idx { color:var(--muted); text-align:center; font-weight:600; }
+.veg-idx { color:var(--muted); text-align:left; font-weight:600; padding-left:.05rem; }
 
 .soil-table { display:grid; gap:.45rem; }
 .soil-row { display:grid; grid-template-columns: 1fr 1fr; gap:.5rem; }
@@ -281,8 +281,8 @@ button.primary {
 }
 
 @media (max-width: 560px) {
-  .veg-row { grid-template-columns: 28px minmax(96px,1fr) 78px 36px; gap:.32rem; }
+  .veg-row { grid-template-columns: 18px minmax(98px,1fr) 56px 34px; gap:.28rem; }
   .veg-header { font-size:.74rem; }
-  .veg-row input { padding:.46rem .45rem; }
+  .veg-row input { padding:.46rem .4rem; }
   .veg-head .group-title { font-size:.95rem; }
 }
