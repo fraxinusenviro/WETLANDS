@@ -313,8 +313,8 @@ function syncHorizonDepthLinks() {
         continue;
       }
 
-      const start = Number(state[`SoilH${h}StartDepthCM`]);
-      if (Number.isFinite(start)) state[`SoilH${h - 1}EndDepthCM`] = String(start);
+      const prevEnd = Number(state[`SoilH${h - 1}EndDepthCM`]);
+      if (Number.isFinite(prevEnd)) state[`SoilH${h}StartDepthCM`] = String(prevEnd);
     }
 
     recomputeHorizonThickness(h);
@@ -433,6 +433,11 @@ function renderSoils() {
               input.readOnly = true;
               input.title = 'Auto-calculated as End Depth - Start Depth.';
             }
+            const startMatch = key.match(/^SoilH(\d+)StartDepthCM$/);
+            if (startMatch && Number(startMatch[1]) > 1) {
+              input.readOnly = true;
+              input.title = 'Auto-populated from previous horizon end depth.';
+            }
             if (/SoilH\d+(Matrix|Redox)$/.test(key)) {
               input.setAttribute('list', 'munsell-options');
               input.placeholder = 'e.g., 10YR 4/3';
@@ -442,10 +447,10 @@ function renderSoils() {
               state[key] = input.value;
               const mStart = key.match(/^SoilH(\d+)StartDepthCM$/);
               const mEnd = key.match(/^SoilH(\d+)EndDepthCM$/);
-              if (mStart) {
+              if (mStart && Number(mStart[1]) === 1) {
                 syncHorizonDepthLinks();
               } else if (mEnd) {
-                recomputeHorizonThickness(Number(mEnd[1]));
+                syncHorizonDepthLinks();
               }
               queueAutosave();
             };
@@ -458,12 +463,9 @@ function renderSoils() {
               }
               const mStart = key.match(/^SoilH(\d+)StartDepthCM$/);
               const mEnd = key.match(/^SoilH(\d+)EndDepthCM$/);
-              if (mStart) {
+              if ((mStart && Number(mStart[1]) === 1) || mEnd) {
                 syncHorizonDepthLinks();
                 renderSoils();
-              } else if (mEnd) {
-                recomputeHorizonThickness(Number(mEnd[1]));
-                queueAutosave();
               }
             };
           }
@@ -485,17 +487,11 @@ function renderSoils() {
     root.appendChild(card);
   }
 
-  const issues = computeHorizonValidationIssues();
   const candidates = updateHydricGuideIndicators();
-  const qc = document.createElement('div');
-  qc.className = 'card';
-  qc.innerHTML = `
-    <h3 class='group-title'>Horizon Quality Check</h3>
-    <p class='muted'>${issues.length ? 'Please review the flagged horizon issues:' : 'No horizon continuity/depth issues detected.'}</p>
-    ${issues.length ? `<ul>${issues.map(i => `<li>${i}</li>`).join('')}</ul>` : ''}
-    <p class='muted'>Hydric candidate indicators from current soil entries: <strong>${candidates.length ? candidates.join(', ') : 'None yet'}</strong></p>
-  `;
-  root.appendChild(qc);
+  const hc = document.createElement('div');
+  hc.className = 'card';
+  hc.innerHTML = `<h3 class='group-title'>Hydric Indicator Candidates</h3><p class='muted'>From current soil entries: <strong>${candidates.length ? candidates.join(', ') : 'None yet'}</strong></p>`;
+  root.appendChild(hc);
 
   root.appendChild(checkGroup('HydricSoilIndicators', hydricSoilIndicators));
 
