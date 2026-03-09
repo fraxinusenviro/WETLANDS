@@ -234,13 +234,18 @@ button.primary {
 .submission-item .row button { padding:.32rem .55rem; border-radius:.45rem; border:1px solid #355178; background:#0f1a2b; color:var(--text); }
 
 .veg-head { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.55rem; }
+.veg-head .group-title { display:flex; align-items:center; gap:.4rem; }
+.veg-head .group-title svg { width:1rem; height:1rem; color:#b9d8ff; }
 .veg-controls { margin-left:auto; display:flex; align-items:center; gap:.35rem; }
 .veg-controls button { border:1px solid var(--line); background:#111d2f; color:var(--text); border-radius:.4rem; padding:.2rem .48rem; }
 .veg-controls .chevron { font-size:1rem; min-width:1.8rem; }
 .veg-count { min-width:2rem; text-align:center; color:var(--muted); font-size:.9rem; }
+.veg-card-tree { background:linear-gradient(165deg,#1b2f2a,#142521); border-color:#32594f; }
+.veg-card-shrub { background:linear-gradient(165deg,#2b2536,#1f1b2d); border-color:#4e4172; }
+.veg-card-herb { background:linear-gradient(165deg,#2b301e,#202613); border-color:#56683a; }
 
 .veg-table { display:grid; gap:.42rem; }
-.veg-row { display:grid; grid-template-columns: 42px minmax(220px,1fr) 110px 90px 62px; gap:.5rem; align-items:center; }
+.veg-row { display:grid; grid-template-columns: 42px minmax(240px,1fr) 120px 62px; gap:.5rem; align-items:center; }
 .veg-row input { width:100%; padding:.52rem .56rem; border-radius:.45rem; border:1px solid #324869; background:#0f1827; color:var(--text); }
 .veg-row input[type='checkbox'] { width:18px; height:18px; justify-self:center; accent-color:#4cd18f; padding:0; }
 .veg-header { color:var(--muted); font-size:.84rem; font-weight:600; padding:0 .1rem; }

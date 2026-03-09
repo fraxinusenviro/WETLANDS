@@ -167,13 +167,14 @@ function renderVegetation() {
   const root = document.getElementById('vegetation-fields'); root.innerHTML = '';
   [['Tree',6],['Shrub',6],['Herb',10]].forEach(([g, n]) => {
     const card = document.createElement('div');
-    card.className = 'card';
+    card.className = `card veg-card veg-card-${g.toLowerCase()}`;
 
     const head = document.createElement('div');
     head.className = 'veg-head';
     const title = document.createElement('h3');
     title.className = 'group-title';
-    title.textContent = `${g} Species`;
+    const vegIcon = g === 'Tree' ? 'trees' : (g === 'Shrub' ? 'sprout' : 'flower-2');
+    title.innerHTML = `<i data-lucide='${vegIcon}'></i> ${g} Species`;
 
     const controls = document.createElement('div');
     controls.className = 'veg-controls';
@@ -189,7 +190,7 @@ function renderVegetation() {
     if (!vegUi[g].collapsed) {
       const table = document.createElement('div');
       table.className = 'veg-table';
-      table.innerHTML = `<div class='veg-row veg-header'><div>#</div><div>Species (Common / Scientific / MCode)</div><div>Status</div><div>%</div><div>Dom</div></div>`;
+      table.innerHTML = `<div class='veg-row veg-header'><div>#</div><div>Species (Common / Scientific / MCode + Status)</div><div>% Cover</div><div>Dom</div></div>`;
 
       for (let i = 1; i <= Math.min(vegUi[g].count, n); i++) {
         const row = document.createElement('div');
@@ -210,12 +211,6 @@ function renderVegetation() {
           queueAutosave();
           renderVegetation();
         };
-
-        const status = document.createElement('input');
-        status.type = 'text';
-        status.value = state[`${g}Sp${i}Status`] ?? '';
-        status.placeholder = 'Status';
-        status.readOnly = true;
 
         const cov = document.createElement('input');
         cov.type = 'number';
@@ -239,7 +234,6 @@ function renderVegetation() {
         dom.title = 'Auto-calculated using 50/20 rule';
 
         row.appendChild(species);
-        row.appendChild(status);
         row.appendChild(cov);
         row.appendChild(dom);
         table.appendChild(row);
@@ -274,6 +268,7 @@ function renderVegetation() {
   root.querySelectorAll('button[data-minus]').forEach(b => b.onclick = () => {
     const g = b.dataset.minus; vegUi[g].count = Math.max(1, vegUi[g].count - 1); renderVegetation();
   });
+  refreshLucideIcons();
 }
 
 function renderHydrology() {
@@ -445,8 +440,13 @@ function renderSoils() {
             }
             input.oninput = () => {
               state[key] = input.value;
-              const m = key.match(/^SoilH(\d+)(StartDepthCM|EndDepthCM)$/);
-              if (m) syncHorizonDepthLinks();
+              const mStart = key.match(/^SoilH(\d+)StartDepthCM$/);
+              const mEnd = key.match(/^SoilH(\d+)EndDepthCM$/);
+              if (mStart) {
+                syncHorizonDepthLinks();
+              } else if (mEnd) {
+                recomputeHorizonThickness(Number(mEnd[1]));
+              }
               queueAutosave();
             };
             input.onblur = () => {
@@ -456,10 +456,14 @@ function renderSoils() {
                 state[key] = normalized;
                 queueAutosave();
               }
-              const m = key.match(/^SoilH(\d+)(StartDepthCM|EndDepthCM)$/);
-              if (m) {
+              const mStart = key.match(/^SoilH(\d+)StartDepthCM$/);
+              const mEnd = key.match(/^SoilH(\d+)EndDepthCM$/);
+              if (mStart) {
                 syncHorizonDepthLinks();
                 renderSoils();
+              } else if (mEnd) {
+                recomputeHorizonThickness(Number(mEnd[1]));
+                queueAutosave();
               }
             };
           }
