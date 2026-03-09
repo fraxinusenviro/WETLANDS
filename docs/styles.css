@@ -245,8 +245,8 @@ button.primary {
 .veg-card-herb { background:linear-gradient(165deg,#2b301e,#202613); border-color:#56683a; }
 
 .veg-table { display:grid; gap:.42rem; }
-.veg-row { display:grid; grid-template-columns: 42px minmax(240px,1fr) 120px 62px; gap:.5rem; align-items:center; }
-.veg-row input { width:100%; padding:.52rem .56rem; border-radius:.45rem; border:1px solid #324869; background:#0f1827; color:var(--text); }
+.veg-row { display:grid; grid-template-columns: 34px minmax(140px,1fr) 92px 44px; gap:.4rem; align-items:center; }
+.veg-row input { width:100%; min-width:0; padding:.52rem .56rem; border-radius:.45rem; border:1px solid #324869; background:#0f1827; color:var(--text); }
 .veg-row input[type='checkbox'] { width:18px; height:18px; justify-self:center; accent-color:#4cd18f; padding:0; }
 .veg-header { color:var(--muted); font-size:.84rem; font-weight:600; padding:0 .1rem; }
 .veg-idx { color:var(--muted); text-align:center; font-weight:600; }
@@ -278,4 +278,11 @@ button.primary {
   .tabs { top: 60px; }
   .tab-nav { top: 102px; }
   h2 { font-size: 1.6rem; }
+}
+
+@media (max-width: 560px) {
+  .veg-row { grid-template-columns: 28px minmax(96px,1fr) 78px 36px; gap:.32rem; }
+  .veg-header { font-size:.74rem; }
+  .veg-row input { padding:.46rem .45rem; }
+  .veg-head .group-title { font-size:.95rem; }
 }
