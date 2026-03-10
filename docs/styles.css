@@ -272,6 +272,24 @@ button.primary {
 .instructions-popover ul { margin: .6rem 0; padding-left: 1.1rem; color: #d2e2fb; }
 .instructions-popover code { background:#0b1321; padding:.08rem .3rem; border-radius:.2rem; border:1px solid #2a3e5d; }
 
+.plant-ref-fields { display: grid; gap: .38rem; }
+.plant-ref-row { margin: 0; display: grid; gap: .15rem; }
+.plant-ref-key { display: inline-flex; align-items: center; gap: .3rem; font-weight: 700; }
+.info-dot {
+  width: 1rem;
+  height: 1rem;
+  min-width: 1rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid #4f668b;
+  background: #0f1b2d;
+  color: #cfe2ff;
+  font-size: .68rem;
+  line-height: 1;
+  font-weight: 700;
+}
+.info-dot:hover { border-color: #7ba6e6; }
+
 @media (max-width: 920px) {
   .submissions-layout { grid-template-columns: 1fr; }
   .brand-logo { width:36px; height:36px; }

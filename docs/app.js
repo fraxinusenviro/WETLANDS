@@ -829,7 +829,12 @@ function renderPlantReferenceList(query = '') {
     btn.innerHTML = `<strong>${common}</strong><span><em>${sci}</em> · ${code} · ${status}</span>`;
     btn.onclick = () => {
       const entries = Object.entries(r).filter(([,v]) => String(v || '').trim() !== '');
-      detail.innerHTML = `<h3>${common}</h3><p class='muted'><em>${sci}</em></p><div>${entries.map(([k,v]) => `<p><strong>${k}:</strong> ${v}${speciesDataDictionary[k] ? `<br><span class='muted'>${speciesDataDictionary[k]}</span>` : ''}</p>`).join('')}</div>`;
+      detail.innerHTML = `<h3>${common}</h3><p class='muted'><em>${sci}</em></p><div class='plant-ref-fields'>${entries.map(([k,v]) => {
+        const desc = String(speciesDataDictionary[k] || '').trim();
+        const safeDesc = desc.replace(/"/g, '&quot;');
+        const infoBtn = desc ? `<button type='button' class='info-dot' title='${safeDesc}' aria-label='About ${k}'>i</button>` : '';
+        return `<p class='plant-ref-row'><span class='plant-ref-key'>${k}${infoBtn}</span><span>${v}</span></p>`;
+      }).join('')}</div>`;
     };
     list.appendChild(btn);
     if (idx === 0 && !query) btn.click();
@@ -1670,30 +1675,53 @@ async function measureImage(dataUrl) {
 }
 
 let pdfLogoDataUrlCache = null;
+async function blobToPngDataUrl(blob) {
+  return await new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || img.width || 0;
+        const h = img.naturalHeight || img.height || 0;
+        if (!w || !h) throw new Error('Invalid logo dimensions');
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (err) {
+        reject(err);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Unable to decode logo image'));
+    };
+    img.src = objectUrl;
+  });
+}
+
 async function loadPdfLogoDataUrl() {
   if (pdfLogoDataUrlCache) return pdfLogoDataUrlCache;
   try {
     const logoCandidates = [
-      new URL('assets/fraxinus-logo.svg?v=3', window.location.href).href,
-      new URL('icon-192.png', window.location.href).href
+      new URL('icon-192.png', window.location.href).href,
+      new URL('assets/fraxinus-logo.svg?v=3', window.location.href).href
     ];
-    let blob = null;
     for (const logoUrl of logoCandidates) {
       try {
         const res = await fetch(logoUrl);
-        if (res.ok) { blob = await res.blob(); break; }
+        if (!res.ok) continue;
+        const blob = await res.blob();
+        const dataUrl = await blobToPngDataUrl(blob);
+        pdfLogoDataUrlCache = String(dataUrl || '');
+        if (pdfLogoDataUrlCache) return pdfLogoDataUrlCache;
       } catch {}
     }
-    if (!blob) return '';
-
-    const dataUrl = await new Promise((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(fr.result);
-      fr.onerror = () => reject(fr.error || new Error('Failed to read logo blob'));
-      fr.readAsDataURL(blob);
-    });
-    pdfLogoDataUrlCache = String(dataUrl || '');
-    return pdfLogoDataUrlCache;
+    return '';
   } catch {
     return '';
   }
@@ -1746,24 +1774,26 @@ async function exportRecordPdf(s, base) {
 
   const drawHeader = () => {
     ensureSpace(60);
+    const logoSize = 34;
+    const textX = margin + logoSize + 10;
     if (logoDataUrl) {
-      try { doc.addImage(logoDataUrl, 'PNG', margin, y + 2, 24, 24); } catch {}
+      try { doc.addImage(logoDataUrl, 'PNG', margin, y + 1, logoSize, logoSize); } catch {}
     }
 
     doc.setDrawColor(...colors.line);
-    doc.line(margin, y + 40, pageW - margin, y + 40);
+    doc.line(margin, y + 44, pageW - margin, y + 44);
 
     doc.setTextColor(...colors.ink);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(15);
-    doc.text('Wetland Delineation Report', margin + 30, y + 16);
+    doc.text('Wetland Delineation Report', textX, y + 16);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...colors.muted);
-    doc.text('Nova Scotia Field Data Form', margin + 30, y + 30);
+    doc.text('Nova Scotia Field Data Form', textX, y + 30);
     doc.text(`Generated ${new Date().toLocaleString()}`, pageW - margin, y + 16, { align: 'right' });
-    y += 52;
+    y += 56;
   };
 
   const sectionTitle = (title) => {
@@ -2260,19 +2290,21 @@ async function exportRecordPdfFormStyle(s, base) {
   };
 
   // Header block
+  const logoSize = 34;
+  const textX = margin + logoSize + 10;
   if (logoDataUrl) {
-    try { doc.addImage(logoDataUrl, 'PNG', margin, y, 24, 24); } catch {}
+    try { doc.addImage(logoDataUrl, 'PNG', margin, y - 1, logoSize, logoSize); } catch {}
   }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(15, 23, 42);
-  doc.text('WETLAND DELINEATION DATA FORM – NOVA SCOTIA', margin + 30, y + 12);
+  doc.text('WETLAND DELINEATION DATA FORM – NOVA SCOTIA', textX, y + 12);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(71, 85, 105);
-  doc.text('Adapted workflow output for field reporting (aesthetic form-style export)', margin + 30, y + 22);
+  doc.text('Adapted workflow output for field reporting (aesthetic form-style export)', textX, y + 22);
   doc.text(`Generated ${new Date().toLocaleString()}`, pageW - margin, y + 12, { align: 'right' });
-  y += 32;
+  y += 38;
   doc.setDrawColor(203, 213, 225);
   doc.line(margin, y, pageW - margin, y);
   y += 10;
