@@ -7,6 +7,7 @@ const redoxTypeOptions = ["", "Concentrations", "Depletions", "Pore Linings", "N
 const redoxLocationOptions = ["", "Matrix", "Pore", "Root Channel", "Ped Face", "Combined", "Other"];
 const textureTriangleOptions = ["", "Organic", "Sand", "Loamy Sand", "Sandy Loam", "Loam", "Silt Loam", "Silt", "Sandy Clay Loam", "Clay Loam", "Silty Clay Loam", "Sandy Clay", "Silty Clay", "Clay"];
 const pageOrder = ["metadata", "vegetation", "hydrology", "soils"];
+const WETLAND_MODELS_URL = 'https://felt.com/map/FRAXINUS-FIELD-DATA-TESTING-xPT3HHZtRuWZCXy1pnq9CrB?share=1&loc=0,-93.58,1.9z';
 
 const hydricSoilIndicators = ["Histosol (A1)","Histic Epipedon (A2)","Black Histic (A3)","Hydrogen Sulfide (A4)","Stratified Layers (A5)","Depleted Below Dark Surface (A11)","Thick Dark Surface (A12)","Sandy Mucky Mineral (S1)","Sandy Gleyed Matrix (S4)","Sandy Redox (S5)","Polyvalue Below Surface (S8)","Thin Dark Surface (S9)","Loamy Gleyed Matrix (F2)","Depleted Matrix (F3)","Redox Dark Surface (F6)","Depleted Dark Surface (F7)","Redox Depressions (F8)"];
 const wetlandHydrologyPrimary = ["Surface Water (A1)","High Water Table (A2)","Saturation (A3)","Water Marks (B1)","Sediment Deposits (B2)","Drift Deposits (B3)","Algal Mat or Crust (B4)","Iron Deposits (B5)","Inundation Visible on Aerial Imagery (B7)","Sparsely Vegetated Concave Surface (B8)","Water-Stained Leaves (B9)","Aquatic Fauna (B13)","Marl Deposits (B15)","Hydrogen Sulfide Odor (C1)","Oxidized Rhizospheres on Living Roots (C3)","Presence of Reduced Iron (C4)","Recent Iron Reduction in Tilled Soils (C6)","Thin Muck Surface (C7)","Other (Explain in Remarks)"];
@@ -582,6 +583,14 @@ function bindActions() {
   document.getElementById('btn-open-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); showView('submissions'); };
   document.getElementById('btn-open-drafts').onclick = async () => { draftsLibrary = await loadDraftLibrary(); renderDraftsLibrary(); showView('drafts'); };
   document.getElementById('btn-open-plant-ref').onclick = () => { renderPlantReferenceList(''); showView('plant-ref'); };
+  document.getElementById('btn-open-models').onclick = () => {
+    const frame = document.getElementById('wetland-models-frame');
+    if (frame && (!frame.getAttribute('src') || frame.getAttribute('src') === 'about:blank')) frame.setAttribute('src', WETLAND_MODELS_URL);
+    showView('models');
+  };
+  document.getElementById('btn-open-models-new-tab')?.addEventListener('click', () => {
+    window.open(WETLAND_MODELS_URL, '_blank', 'noopener,noreferrer');
+  });
   document.getElementById('btn-refresh-submissions').onclick = async () => { surveys = await loadSurveys(); renderSubmissions(); };
   document.getElementById('btn-refresh-drafts').onclick = async () => { draftsLibrary = await loadDraftLibrary(); renderDraftsLibrary(); };
   const plantSearch = document.getElementById('plant-ref-search');

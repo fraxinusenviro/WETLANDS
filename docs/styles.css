@@ -129,6 +129,7 @@ h2 { margin-top: .35rem; font-size: 2rem; letter-spacing: .2px; }
 .launch-submissions { background: linear-gradient(160deg, #173348, #194e5d); border-color: #2b6c7f; }
 .launch-drafts { background: linear-gradient(160deg, #2d2447, #402f66); border-color: #6345a5; }
 .launch-reference { background: linear-gradient(160deg, #2f2b1c, #4a4427); border-color: #7a6f38; }
+.launch-models { background: linear-gradient(160deg, #1e2d42, #1c3957); border-color: #3f6794; }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .7rem; }
 .stats .card {
@@ -232,6 +233,15 @@ button.primary {
 .submission-item p { margin:0; color:var(--muted); font-size:.85rem; }
 .submission-item .row { margin-top:.5rem; display:flex; gap:.4rem; flex-wrap:wrap; }
 .submission-item .row button { padding:.32rem .55rem; border-radius:.45rem; border:1px solid #355178; background:#0f1a2b; color:var(--text); }
+
+.models-card { padding: .4rem; }
+.models-frame {
+  width: 100%;
+  min-height: 72vh;
+  border: 1px solid var(--line);
+  border-radius: .6rem;
+  background: #0b1321;
+}
 
 .veg-head { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.55rem; }
 .veg-head .group-title { display:flex; align-items:center; gap:.4rem; }

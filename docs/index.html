@@ -58,6 +58,13 @@
             <span>Search NS indicator records and view full species details.</span>
           </span>
         </button>
+        <button class="launch-card launch-models" id="btn-open-models">
+          <span class="launch-icon" aria-hidden="true"><i data-lucide="map"></i></span>
+          <span class="launch-copy">
+            <strong>Wetland Models</strong>
+            <span>Open live Felt map models with location access enabled.</span>
+          </span>
+        </button>
       </div>
       <div class="stats" id="dashboard-stats"></div>
     </section>
@@ -74,6 +81,24 @@
       </div>
       <div class="card" id="plant-ref-detail">
         <p class="muted">Select a species to view record details.</p>
+      </div>
+    </section>
+
+    <section id="view-models" class="view">
+      <h2>Wetland Models</h2>
+      <p class="muted">Felt map workspace for field model review. If prompted, allow location access.</p>
+      <div class="actions">
+        <button id="btn-open-models-new-tab" class="ghost" type="button">Open in New Tab</button>
+      </div>
+      <div class="card models-card">
+        <iframe
+          id="wetland-models-frame"
+          title="Wetland Models"
+          class="models-frame"
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allow="geolocation; fullscreen"
+          src="about:blank"></iframe>
       </div>
     </section>
 
@@ -215,6 +240,6 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=35"></script>
+  <script src="app.js?v=36"></script>
 </body>
 </html>
