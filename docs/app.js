@@ -26,6 +26,9 @@ const KV_STORE = 'kv';
 const DRAFT_KEY = 'wetlandCurrentDraft';
 const DRAFT_LIBRARY_KEY = 'wetlandDraftLibrary';
 const SURVEYS_KEY = 'wetlandSurveys';
+const DRAFT_BACKUP_KEY = `${DRAFT_KEY}__backup`;
+const DRAFT_LIBRARY_BACKUP_KEY = `${DRAFT_LIBRARY_KEY}__backup`;
+const SURVEYS_BACKUP_KEY = `${SURVEYS_KEY}__backup`;
 
 let speciesList = ["ACERrubr", "PICErube", "QUERrubr", "KALMangu", "VIBUcass", "PTERaqui"];
 let speciesRecords = [];
@@ -530,6 +533,16 @@ function checkGroup(key, options) {
   wrap.appendChild(grid); return wrap;
 }
 
+function showInfoModal(label, text) {
+  const dialog = document.getElementById('info-popover');
+  const title = document.getElementById('info-popover-title');
+  const body = document.getElementById('info-popover-body');
+  if (!dialog || !title || !body) return;
+  title.textContent = label ? `About ${label}` : 'Field Information';
+  body.textContent = text || 'No additional information available.';
+  dialog.showModal();
+}
+
 function bindActions() {
   document.getElementById('btn-home').onclick = async () => {
     if (document.getElementById('view-form')?.classList.contains('active')) {
@@ -546,6 +559,16 @@ function bindActions() {
   });
   document.getElementById('btn-close-instructions')?.addEventListener('click', () => {
     document.getElementById('instructions-popover')?.close();
+  });
+  document.getElementById('btn-close-info')?.addEventListener('click', () => {
+    document.getElementById('info-popover')?.close();
+  });
+  document.addEventListener('click', (ev) => {
+    const btn = ev.target instanceof Element ? ev.target.closest('.info-dot') : null;
+    if (!btn) return;
+    const info = btn.getAttribute('data-info') || '';
+    const label = btn.getAttribute('data-label') || '';
+    showInfoModal(label, info);
   });
   document.getElementById('btn-hydric-guide')?.addEventListener('click', () => {
     updateHydricGuideIndicators();
@@ -831,9 +854,10 @@ function renderPlantReferenceList(query = '') {
       const entries = Object.entries(r).filter(([,v]) => String(v || '').trim() !== '');
       detail.innerHTML = `<h3>${common}</h3><p class='muted'><em>${sci}</em></p><div class='plant-ref-fields'>${entries.map(([k,v]) => {
         const desc = String(speciesDataDictionary[k] || '').trim();
-        const safeDesc = desc.replace(/"/g, '&quot;');
-        const infoBtn = desc ? `<button type='button' class='info-dot' title='${safeDesc}' aria-label='About ${k}'>i</button>` : '';
-        return `<p class='plant-ref-row'><span class='plant-ref-key'>${k}${infoBtn}</span><span>${v}</span></p>`;
+        const infoBtn = desc
+          ? `<button type='button' class='info-dot' data-info='${escapeHtml(desc)}' data-label='${escapeHtml(k)}' aria-label='About ${escapeHtml(k)}'>i</button>`
+          : '';
+        return `<p class='plant-ref-row'><span class='plant-ref-key'>${escapeHtml(k)}${infoBtn}</span><span>${escapeHtml(v)}</span></p>`;
       }).join('')}</div>`;
     };
     list.appendChild(btn);
@@ -1138,6 +1162,32 @@ function cloneData(obj) {
   if (typeof structuredClone === 'function') return structuredClone(obj);
   return JSON.parse(JSON.stringify(obj));
 }
+
+function readLocalJson(key, fallback = null) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalBackup(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+function removeLocalBackup(key) {
+  try { localStorage.removeItem(key); } catch {}
+}
+
+function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 function makeId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `id_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -1214,23 +1264,25 @@ async function migrateLegacyLocalStorage() {
   try {
     const existingDraft = await idbGet(DRAFT_KEY, null);
     if (existingDraft == null) {
-      const rawDraft = localStorage.getItem(DRAFT_KEY);
-      if (rawDraft) {
-        try { await idbSet(DRAFT_KEY, JSON.parse(rawDraft)); } catch {}
+      const draft = readLocalJson(DRAFT_KEY, null) ?? readLocalJson(DRAFT_BACKUP_KEY, null);
+      if (draft != null) {
+        try { await idbSet(DRAFT_KEY, draft); } catch {}
       }
     }
+
     const existingSurveys = await idbGet(SURVEYS_KEY, null);
     if (existingSurveys == null) {
-      const rawSurveys = localStorage.getItem(SURVEYS_KEY);
-      if (rawSurveys) {
-        try { await idbSet(SURVEYS_KEY, JSON.parse(rawSurveys)); } catch {}
+      const surveys = readLocalJson(SURVEYS_KEY, null) ?? readLocalJson(SURVEYS_BACKUP_KEY, null);
+      if (surveys != null) {
+        try { await idbSet(SURVEYS_KEY, surveys); } catch {}
       }
     }
+
     const existingDraftLibrary = await idbGet(DRAFT_LIBRARY_KEY, null);
     if (existingDraftLibrary == null) {
-      const rawDraftLibrary = localStorage.getItem(DRAFT_LIBRARY_KEY);
-      if (rawDraftLibrary) {
-        try { await idbSet(DRAFT_LIBRARY_KEY, JSON.parse(rawDraftLibrary)); } catch {}
+      const draftLibrary = readLocalJson(DRAFT_LIBRARY_KEY, null) ?? readLocalJson(DRAFT_LIBRARY_BACKUP_KEY, null);
+      if (draftLibrary != null) {
+        try { await idbSet(DRAFT_LIBRARY_KEY, draftLibrary); } catch {}
       }
     }
   } catch (err) {
@@ -1238,13 +1290,30 @@ async function migrateLegacyLocalStorage() {
   }
 }
 
-async function loadDraft() { return await idbGet(DRAFT_KEY, null); }
-async function loadDraftLibrary() { return await idbGet(DRAFT_LIBRARY_KEY, []); }
-async function loadSurveys() { return await idbGet(SURVEYS_KEY, []); }
-async function saveDraft(draft) { await idbSet(DRAFT_KEY, draft); }
-async function saveDraftLibrary(rows) { await idbSet(DRAFT_LIBRARY_KEY, rows); }
-async function saveSurveys(rows) { await idbSet(SURVEYS_KEY, rows); }
-async function clearDraft() { await idbDelete(DRAFT_KEY); }
+async function loadDraft() {
+  try { return await idbGet(DRAFT_KEY, null); }
+  catch { return readLocalJson(DRAFT_BACKUP_KEY, null) ?? readLocalJson(DRAFT_KEY, null); }
+}
+async function loadDraftLibrary() {
+  try { return await idbGet(DRAFT_LIBRARY_KEY, []); }
+  catch { return readLocalJson(DRAFT_LIBRARY_BACKUP_KEY, []) ?? readLocalJson(DRAFT_LIBRARY_KEY, []); }
+}
+async function loadSurveys() {
+  try { return await idbGet(SURVEYS_KEY, []); }
+  catch { return readLocalJson(SURVEYS_BACKUP_KEY, []) ?? readLocalJson(SURVEYS_KEY, []); }
+}
+async function saveDraft(draft) {
+  try { await idbSet(DRAFT_KEY, draft); } finally { writeLocalBackup(DRAFT_BACKUP_KEY, draft); }
+}
+async function saveDraftLibrary(rows) {
+  try { await idbSet(DRAFT_LIBRARY_KEY, rows); } finally { writeLocalBackup(DRAFT_LIBRARY_BACKUP_KEY, rows); }
+}
+async function saveSurveys(rows) {
+  try { await idbSet(SURVEYS_KEY, rows); } finally { writeLocalBackup(SURVEYS_BACKUP_KEY, rows); }
+}
+async function clearDraft() {
+  try { await idbDelete(DRAFT_KEY); } finally { removeLocalBackup(DRAFT_BACKUP_KEY); }
+}
 
 async function saveDraftSnapshot(name = 'In-progress draft') {
   const snapshot = {
