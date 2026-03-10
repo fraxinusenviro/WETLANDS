@@ -831,6 +831,32 @@ function searchPlantReference(q) {
   }).slice(0, 150);
 }
 
+function getSpeciesFieldDescription(label) {
+  const key = String(label || '').trim();
+  if (!key) return '';
+  if (speciesDataDictionary[key]) return String(speciesDataDictionary[key] || '').trim();
+
+  const lowerKey = key.toLowerCase();
+  const exactLowerMatch = Object.keys(speciesDataDictionary).find(k => k.toLowerCase() === lowerKey);
+  if (exactLowerMatch) return String(speciesDataDictionary[exactLowerMatch] || '').trim();
+
+  const normalized = lowerKey.replace(/[^a-z0-9]/g, '');
+  const fuzzyMatch = Object.keys(speciesDataDictionary).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized);
+  if (fuzzyMatch) return String(speciesDataDictionary[fuzzyMatch] || '').trim();
+
+  return '';
+}
+
+function statusBadgeClass(status) {
+  const s = String(status || '').trim().toUpperCase();
+  if (s === 'OBL') return 'status-obl';
+  if (s === 'FACW') return 'status-facw';
+  if (s === 'FAC') return 'status-fac';
+  if (s === 'FACU') return 'status-facu';
+  if (s === 'UPL') return 'status-upl';
+  return 'status-na';
+}
+
 function renderPlantReferenceList(query = '') {
   const list = document.getElementById('plant-ref-results');
   const detail = document.getElementById('plant-ref-detail');
@@ -844,21 +870,34 @@ function renderPlantReferenceList(query = '') {
   list.innerHTML = '';
   rows.forEach((r, idx) => {
     const btn = document.createElement('button');
-    btn.className = 'launch-card';
+    btn.className = 'launch-card plant-card';
     const sci = r['AC CDC Name'] || r['GS Name'] || 'Unknown';
     const common = r['AC CDC English Name'] || r['GS English Name'] || 'Unknown';
     const code = r['ELCODE'] || '—';
     const status = String(r['NS Wetland Indicator Rank'] || '').toUpperCase() || '—';
-    btn.innerHTML = `<strong>${common}</strong><span><em>${sci}</em> · ${code} · ${status}</span>`;
+    btn.innerHTML = `
+      <span class='plant-card-main'>
+        <span class='plant-card-common'>${escapeHtml(common)}</span>
+        <span class='plant-card-sci'><em>${escapeHtml(sci)}</em></span>
+        <span class='plant-card-meta'>${escapeHtml(code)}</span>
+      </span>
+      <span class='status-badge ${statusBadgeClass(status)}'>${escapeHtml(status)}</span>
+    `;
     btn.onclick = () => {
       const entries = Object.entries(r).filter(([,v]) => String(v || '').trim() !== '');
-      detail.innerHTML = `<h3>${common}</h3><p class='muted'><em>${sci}</em></p><div class='plant-ref-fields'>${entries.map(([k,v]) => {
-        const desc = String(speciesDataDictionary[k] || '').trim();
-        const infoBtn = desc
-          ? `<button type='button' class='info-dot' data-info='${escapeHtml(desc)}' data-label='${escapeHtml(k)}' aria-label='About ${escapeHtml(k)}'>i</button>`
-          : '';
-        return `<p class='plant-ref-row'><span class='plant-ref-key'>${escapeHtml(k)}${infoBtn}</span><span>${escapeHtml(v)}</span></p>`;
-      }).join('')}</div>`;
+      detail.innerHTML = `
+        <h3>${escapeHtml(common)}</h3>
+        <p class='muted'><em>${escapeHtml(sci)}</em></p>
+        <p class='muted plant-ref-note'>Data below are per the NS Wetland Plant Indicator Status List.</p>
+        <ul class='plant-ref-bullets'>
+          ${entries.map(([k,v]) => {
+            const desc = getSpeciesFieldDescription(k);
+            const infoBtn = desc
+              ? `<button type='button' class='info-dot' data-info='${escapeHtml(desc)}' data-label='${escapeHtml(k)}' aria-label='About ${escapeHtml(k)}'>i</button>`
+              : '';
+            return `<li class='plant-ref-line'><span class='plant-ref-key-inline'>${escapeHtml(k)} ${infoBtn} : ${escapeHtml(v)}</span></li>`;
+          }).join('')}
+        </ul>`;
     };
     list.appendChild(btn);
     if (idx === 0 && !query) btn.click();
