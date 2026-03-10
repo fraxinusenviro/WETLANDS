@@ -876,19 +876,21 @@ function renderPlantReferenceList(query = '') {
     const code = r['ELCODE'] || '—';
     const status = String(r['NS Wetland Indicator Rank'] || '').toUpperCase() || '—';
     btn.innerHTML = `
-      <span class='plant-card-main'>
-        <span class='plant-card-common'>${escapeHtml(common)}</span>
-        <span class='plant-card-sci'><em>${escapeHtml(sci)}</em></span>
-        <span class='plant-card-meta'>${escapeHtml(code)}</span>
+      <span class='plant-card-head'>
+        <span class='plant-card-main'>
+          <span class='plant-card-common'>${escapeHtml(common)}</span>
+          <span class='plant-card-sci'><em>${escapeHtml(sci)}</em></span>
+        </span>
+        <span class='status-badge status-circle ${statusBadgeClass(status)}'>${escapeHtml(status)}</span>
       </span>
-      <span class='status-badge ${statusBadgeClass(status)}'>${escapeHtml(status)}</span>
+      <span class='plant-card-divider'></span>
+      <span class='plant-card-meta'>${escapeHtml(code)}</span>
     `;
     btn.onclick = () => {
       const entries = Object.entries(r).filter(([,v]) => String(v || '').trim() !== '');
       detail.innerHTML = `
         <h3>${escapeHtml(common)}</h3>
         <p class='muted'><em>${escapeHtml(sci)}</em></p>
-        <p class='muted plant-ref-note'>Data below are per the NS Wetland Plant Indicator Status List.</p>
         <ul class='plant-ref-bullets'>
           ${entries.map(([k,v]) => {
             const desc = getSpeciesFieldDescription(k);

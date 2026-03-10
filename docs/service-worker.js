@@ -1,4 +1,4 @@
-const CACHE = "wetlands-1-1-v16";
+const CACHE = "wetlands-1-1-v17";
 const ASSETS = [
   "./",
   "./index.html",
