@@ -38,8 +38,12 @@ main { padding: 1rem 1rem 1.2rem; max-width: 1400px; margin: 0 auto; }
 }
 .brand { display: flex; align-items: center; gap: .8rem; }
 .brand-logo {
-  width: 44px; height: 44px; object-fit: contain;
-  border-radius: 10px; padding: 4px;
+  width: 44px;
+  height: 44px;
+  display: block;
+  object-fit: cover;
+  border-radius: 10px;
+  padding: 0;
   background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.01));
   border: 1px solid var(--line-soft);
 }
