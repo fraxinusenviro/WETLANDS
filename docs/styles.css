@@ -234,11 +234,11 @@ button.primary {
 .submission-item .row { margin-top:.5rem; display:flex; gap:.4rem; flex-wrap:wrap; }
 .submission-item .row button { padding:.32rem .55rem; border-radius:.45rem; border:1px solid #355178; background:#0f1a2b; color:var(--text); }
 
-#view-models h2 { margin: 0 0 .35rem; font-size: 1.5rem; }
-.models-card { padding: 0; }
+#view-models { margin-top: .2rem; }
+.models-card { padding: 0; margin: 0; }
 .models-frame {
   width: 100%;
-  min-height: 78vh;
+  min-height: 84vh;
   border: 1px solid var(--line);
   border-radius: .6rem;
   background: #0b1321;
