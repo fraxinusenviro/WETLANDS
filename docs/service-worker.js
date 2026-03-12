@@ -1,4 +1,4 @@
-const CACHE = "wetlands-1-1-v18";
+const CACHE = "wetlands-1-1-v19";
 const ASSETS = [
   "./",
   "./index.html",
@@ -11,7 +11,7 @@ const ASSETS = [
   "./species_ns_data_dictionary.json",
   "./icon-192.png",
   "./icon-512.png",
-  "./assets/fraxinus-logo.svg"
+  "./assets/fraxinus-logo.jpg"
 ];
 
 self.addEventListener("install", (event) => {

@@ -1563,7 +1563,7 @@ function recordMarkdown(s) {
   const lines = [
     `# WETLAND DELINEATION DATA FORM – NOVA SCOTIA`,
     ``,
-    `![Fraxinus Logo](assets/fraxinus-logo.svg)`,
+    `![Fraxinus Logo](assets/fraxinus-logo.jpg)`,
     ``,
     `**Plot ID:** ${s.PLOT_ID || '—'}`,
     ``,
@@ -1599,7 +1599,7 @@ function recordMarkdown(s) {
 function recordHTML(s) {
   const val = (k) => s[k] || '—';
   const yesNo = (k) => (s[k] === 'Yes' ? 'Yes' : s[k] === 'No' ? 'No' : (s[k] || '—'));
-  const logoUrl = new URL('assets/fraxinus-logo.svg', window.location.href).href;
+  const logoUrl = new URL('assets/fraxinus-logo.jpg?v=1', window.location.href).href;
 
   const metadataRows = [
     ['Site Name', val('SiteID')],
@@ -1827,8 +1827,9 @@ async function loadPdfLogoDataUrl() {
   if (pdfLogoDataUrlCache) return pdfLogoDataUrlCache;
   try {
     const logoCandidates = [
+      new URL('assets/fraxinus-logo.jpg?v=1', window.location.href).href,
       new URL('icon-192.png', window.location.href).href,
-      new URL('assets/fraxinus-logo.svg?v=3', window.location.href).href
+      new URL('assets/fraxinus-logo.svg?v=5', window.location.href).href
     ];
     for (const logoUrl of logoCandidates) {
       try {
