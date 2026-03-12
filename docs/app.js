@@ -1794,6 +1794,20 @@ async function measureImage(dataUrl) {
 }
 
 let pdfLogoDataUrlCache = null;
+function getDataUrlImageFormat(dataUrl) {
+  const header = String(dataUrl || '').slice(0, 32).toLowerCase();
+  if (header.startsWith('data:image/jpeg') || header.startsWith('data:image/jpg')) return 'JPEG';
+  if (header.startsWith('data:image/webp')) return 'WEBP';
+  return 'PNG';
+}
+async function blobToDataUrl(blob) {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Unable to read logo image blob'));
+    reader.readAsDataURL(blob);
+  });
+}
 async function blobToPngDataUrl(blob) {
   return await new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(blob);
@@ -1836,7 +1850,8 @@ async function loadPdfLogoDataUrl() {
         const res = await fetch(logoUrl);
         if (!res.ok) continue;
         const blob = await res.blob();
-        const dataUrl = await blobToPngDataUrl(blob);
+        const isSvg = String(blob.type || '').toLowerCase().includes('svg');
+        const dataUrl = isSvg ? await blobToPngDataUrl(blob) : await blobToDataUrl(blob);
         pdfLogoDataUrlCache = String(dataUrl || '');
         if (pdfLogoDataUrlCache) return pdfLogoDataUrlCache;
       } catch {}
@@ -1897,7 +1912,7 @@ async function exportRecordPdf(s, base) {
     const logoSize = 34;
     const textX = margin + logoSize + 10;
     if (logoDataUrl) {
-      try { doc.addImage(logoDataUrl, 'PNG', margin, y + 1, logoSize, logoSize); } catch {}
+      try { doc.addImage(logoDataUrl, getDataUrlImageFormat(logoDataUrl), margin, y + 1, logoSize, logoSize); } catch {}
     }
 
     doc.setDrawColor(...colors.line);
@@ -2413,7 +2428,7 @@ async function exportRecordPdfFormStyle(s, base) {
   const logoSize = 34;
   const textX = margin + logoSize + 10;
   if (logoDataUrl) {
-    try { doc.addImage(logoDataUrl, 'PNG', margin, y - 1, logoSize, logoSize); } catch {}
+    try { doc.addImage(logoDataUrl, getDataUrlImageFormat(logoDataUrl), margin, y - 1, logoSize, logoSize); } catch {}
   }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
